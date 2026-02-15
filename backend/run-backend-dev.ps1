@@ -1,9 +1,9 @@
-$ErrorActionPreference = "Stop"
-
 param(
   [Parameter(Mandatory = $true)]
   [string]$DatabaseUrl
 )
+
+$ErrorActionPreference = "Stop"
 
 Write-Host "=== BACKEND ==="
 
