@@ -1,0 +1,14 @@
+Rova Delivery urls 
+Backend API
+
+http://127.0.0.1:5000/health → API health check
+http://127.0.0.1:5000/api/* → API endpoints
+Vendor Dashboard
+
+http://127.0.0.1:5174 → Vendor web app
+Driver Dashboard
+
+http://127.0.0.1:5175 → Driver web app
+Customer App
+
+http://127.0.0.1:5176 → Customer web app

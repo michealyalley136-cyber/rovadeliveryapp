@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rova-red: #e10600;
+  --rova-dark: #0b0f19;
+  --rova-card: #101826;
+  --text: #ffffff;
+  --muted: #a3acc2;
+}
+
+* {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+body {
+  background: var(--rova-dark);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.glass {
+  background: rgba(16, 24, 38, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.btn-primary {
+  @apply bg-rova-red text-white font-semibold transition hover:bg-rova-red/90 focus:outline-none focus:ring-2 focus:ring-rova-red focus:border-rova-red;
+}
+
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-rova-red focus:border-rova-red;
+}

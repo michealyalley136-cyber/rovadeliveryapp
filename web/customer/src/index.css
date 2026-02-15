@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rova-red: #e10600;
+  --rova-dark: #0b0f19;
+  --rova-card: #101826;
+  --text: #ffffff;
+  --muted: #a3acc2;
+  --status-new-bg: rgba(255, 255, 255, 0.06);
+  --status-new-fg: #cbd5e1;
+  --status-new-bd: rgba(255, 255, 255, 0.16);
+  --status-preparing-bg: rgba(245, 158, 11, 0.12);
+  --status-preparing-fg: #f7d8a5;
+  --status-preparing-bd: rgba(245, 158, 11, 0.28);
+  --status-ready-bg: rgba(16, 185, 129, 0.12);
+  --status-ready-fg: #9fe3c9;
+  --status-ready-bd: rgba(16, 185, 129, 0.28);
+  --status-assigned-bg: rgba(59, 130, 246, 0.12);
+  --status-assigned-fg: #b7d2ff;
+  --status-assigned-bd: rgba(59, 130, 246, 0.28);
+  --status-completed-bg: rgba(255, 255, 255, 0.08);
+  --status-completed-fg: #d1d5db;
+  --status-completed-bd: rgba(255, 255, 255, 0.18);
+  --status-cancelled-bg: rgba(225, 6, 0, 0.12);
+  --status-cancelled-fg: #ffb3ad;
+  --status-cancelled-bd: rgba(225, 6, 0, 0.35);
+}
+
+* {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+body {
+  background: var(--rova-dark);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.glass {
+  background: rgba(16, 24, 38, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.btn-primary {
+  @apply bg-rova-red text-white font-semibold transition hover:bg-rova-red/90 focus:outline-none focus:ring-2 focus:ring-rova-red focus:border-rova-red;
+}
+
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-rova-red focus:border-rova-red;
+}
+
+.status-pill {
+  @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+}
+
+.status-new {
+  background: var(--status-new-bg);
+  color: var(--status-new-fg);
+  border-color: var(--status-new-bd);
+}
+
+.status-preparing {
+  background: var(--status-preparing-bg);
+  color: var(--status-preparing-fg);
+  border-color: var(--status-preparing-bd);
+}
+
+.status-ready {
+  background: var(--status-ready-bg);
+  color: var(--status-ready-fg);
+  border-color: var(--status-ready-bd);
+}
+
+.status-assigned {
+  background: var(--status-assigned-bg);
+  color: var(--status-assigned-fg);
+  border-color: var(--status-assigned-bd);
+}
+
+.status-completed {
+  background: var(--status-completed-bg);
+  color: var(--status-completed-fg);
+  border-color: var(--status-completed-bd);
+}
+
+.status-cancelled {
+  background: var(--status-cancelled-bg);
+  color: var(--status-cancelled-fg);
+  border-color: var(--status-cancelled-bd);
+}
+
+.status-unknown {
+  background: var(--status-new-bg);
+  color: var(--status-new-fg);
+  border-color: var(--status-new-bd);
+}
