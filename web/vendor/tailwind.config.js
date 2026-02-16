@@ -5,9 +5,12 @@ export default {
     extend: {
       colors: {
         rova: {
-          red: '#E10600',
-          dark: '#0B0F19',
-          card: '#101826',
+          red: '#FF6A00',
+          green: '#1F8F3A',
+          orange: '#FF6A00',
+          orangeDark: '#E85F00',
+          dark: '#0B1220',
+          card: '#111B2E',
         },
       },
     },

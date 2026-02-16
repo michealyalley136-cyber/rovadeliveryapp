@@ -7,7 +7,7 @@ from werkzeug.security import check_password_hash
 
 from ..extensions import db
 from ..models import Vendor, Order
-from ..services.order_state import set_order_status, OrderStatusError
+from ..services.order_state import set_order_status, OrderStatusError, normalize_status
 from ..utils.auth import check_password
 from ..utils.responses import ok, error
 from ..utils.validators import validate_required
@@ -118,7 +118,16 @@ def list_orders():
     statuses_param = request.args.get("statuses") or request.args.get("status")
     statuses = None
     if statuses_param:
-        statuses = [s.strip() for s in statuses_param.split(",") if s.strip()]
+        statuses = []
+        for raw in statuses_param.split(","):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                statuses.append(normalize_status(raw))
+            except OrderStatusError:
+                continue
+        statuses = list(dict.fromkeys(statuses))
 
     q = Order.query.filter_by(vendor_id=vendor_id)
     if statuses:
@@ -169,30 +178,6 @@ def ready_order(order_id: int):
     return ok(_order_to_json(order))
 
 
-def _canonical_status(order_status: str) -> str:
-    mapping = {
-        Order.STATUS_CREATED: "NEW",
-        Order.STATUS_SENT_TO_VENDOR: "NEW",
-        Order.STATUS_ACCEPTED: "PREPARING",
-        Order.STATUS_PREPARING: "PREPARING",
-        Order.STATUS_READY: "READY",
-        Order.STATUS_ASSIGNED: "ASSIGNED",
-        Order.STATUS_PICKED_UP: "ASSIGNED",
-        Order.STATUS_DELIVERED: "COMPLETED",
-    }
-    return mapping.get(order_status, order_status.upper() if order_status else "UNKNOWN")
-
-
-def _canonical_to_internal(status: str) -> str:
-    mapping = {
-        "PREPARING": Order.STATUS_PREPARING,
-        "READY": Order.STATUS_READY,
-        "ASSIGNED": Order.STATUS_ASSIGNED,
-        "COMPLETED": Order.STATUS_DELIVERED,
-    }
-    return mapping.get(status)
-
-
 def _log_status_change(order: Order, vendor_id: int, old_status: str, new_status: str) -> None:
     ts = datetime.utcnow().isoformat() + "Z"
     line = f"[{ts}] vendor {vendor_id} status {old_status} -> {new_status}"
@@ -203,7 +188,7 @@ def _log_status_change(order: Order, vendor_id: int, old_status: str, new_status
     db.session.commit()
 
 
-@vendor_bp.route("/orders/<int:order_id>/status", methods=["PATCH"])
+@vendor_bp.route("/orders/<int:order_id>/status", methods=["POST", "PATCH"])
 @jwt_required()
 def update_order_status(order_id: int):
     auth_error = _require_vendor_claims()
@@ -217,33 +202,29 @@ def update_order_status(order_id: int):
         return error("Order not found", 404)
 
     data = request.get_json() or {}
-    requested = (data.get("status") or "").strip().upper()
+    requested = (data.get("next_status") or data.get("status") or "").strip()
     if not requested:
-        return error("Missing status", 400)
-    if requested == "NEW":
-        return error("Cannot set status to NEW", 400)
+        return error("Missing next_status", 400)
+    try:
+        next_status = normalize_status(requested)
+    except OrderStatusError as e:
+        return error(str(e), 400)
 
-    current_canonical = _canonical_status(order.status)
-    allowed = {
-        "NEW": {"PREPARING"},
-        "PREPARING": {"READY"},
-        "READY": {"COMPLETED"},
-    }
-    if current_canonical not in allowed:
-        return error(f"Cannot change status from {current_canonical}", 409)
-    if requested not in allowed[current_canonical]:
-        return error(f"Cannot move from {current_canonical} to {requested}", 409)
+    if next_status == Order.STATUS_DELIVERED:
+        return error("Vendors cannot mark delivered", 403)
 
-    if requested == "COMPLETED" and order.driver_id:
-        return error("Cannot complete once driver is assigned", 409)
+    if next_status == Order.STATUS_READY and order.status == Order.STATUS_NEW:
+        return error("Order must be preparing before ready", 409)
 
-    internal = _canonical_to_internal(requested)
-    if not internal:
-        return error("Invalid status", 400)
+    if next_status == Order.STATUS_ASSIGNED:
+        return error("Vendors cannot assign drivers", 403)
+
+    if next_status == Order.STATUS_CANCELLED:
+        return error("Vendors cannot cancel orders", 403)
 
     old_status = order.status
     try:
-        set_order_status(order, internal, actor="vendor")
+        set_order_status(order, next_status, actor="vendor")
     except OrderStatusError as e:
         return error(str(e), 409)
 

@@ -41,15 +41,15 @@ export const ToastProvider = ({ children }) => {
     <ToastContext.Provider value={{ toast: pushToast, clearPersistentError: () => setPersistentError('') }}>
       {children}
       {persistentError && (
-        <div className="fixed left-1/2 top-6 z-50 w-[90vw] max-w-2xl -translate-x-1/2 rounded-xl border border-rova-red/50 bg-rova-red/10 px-4 py-3 text-sm text-white shadow-lg">
+        <div className="alert-error fixed left-1/2 top-6 z-50 w-[90vw] max-w-2xl -translate-x-1/2 rounded-xl px-4 py-3 text-sm shadow-lg">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-rova-red">Error</div>
-              <div className="mt-1 text-sm text-white">{persistentError}</div>
+              <div className="alert-error-title text-xs uppercase tracking-[0.2em]">Error</div>
+              <div className="mt-1 text-sm">{persistentError}</div>
             </div>
             <button
               onClick={() => setPersistentError('')}
-              className="rounded-lg border border-rova-red/40 px-3 py-1 text-xs text-rova-red hover:border-rova-red"
+              className="alert-error-btn rounded-lg px-3 py-1 text-xs"
             >
               Dismiss
             </button>
@@ -60,12 +60,8 @@ export const ToastProvider = ({ children }) => {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`glass rounded-lg px-4 py-3 text-sm shadow-lg border ${
-              t.type === 'error'
-                ? 'border-rova-red/60 text-rova-red'
-                : t.type === 'success'
-                ? 'border-rova-red/40 text-white'
-                : 'border-white/10 text-slate-200'
+            className={`rova-card glass toast rounded-lg px-4 py-3 text-sm shadow-lg ${
+              t.type === 'error' ? 'toast-error' : t.type === 'success' ? 'toast-success' : 'toast-info'
             }`}
           >
             {t.message}

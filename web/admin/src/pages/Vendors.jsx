@@ -65,7 +65,7 @@ const Vendors = () => {
   return (
     <div className="space-y-6">
       <Topbar title="Vendors" />
-      <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="rova-card glass rounded-2xl p-6 space-y-4">
         {vendors.map((v) => (
           <div key={v.id} className="rounded-xl border border-white/5 p-4">
             <div className="flex items-center justify-between">
@@ -79,7 +79,7 @@ const Vendors = () => {
                 {!v.approved && (
                   <button
                     onClick={() => approve(v.id)}
-                    className="btn-primary rounded-lg px-3 py-1.5 text-xs"
+                    className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
                   >
                     Approve
                   </button>

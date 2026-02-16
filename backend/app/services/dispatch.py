@@ -39,7 +39,7 @@ def find_nearest_drivers(
 
 
 def create_offer(order_id: int, driver_id: int, ttl_seconds: int = OFFER_TTL_SECONDS) -> DriverOffer:
-    """Create a PENDING DriverOffer; set order.driver_id and order.status = ASSIGNED for offer period."""
+    """Create a PENDING DriverOffer for a ready order without assigning it yet."""
     now = datetime.utcnow()
     expires_at = now + timedelta(seconds=ttl_seconds)
     offer = DriverOffer(
@@ -50,12 +50,8 @@ def create_offer(order_id: int, driver_id: int, ttl_seconds: int = OFFER_TTL_SEC
         expires_at=expires_at,
     )
     db.session.add(offer)
-    db.session.flush()
     order = Order.query.get(order_id)
     if order:
-        order.driver_id = driver_id
-        order.status = Order.STATUS_ASSIGNED
-        order.driver_assigned_at = now
         order.offer_expires_at = expires_at
     db.session.commit()
     return offer
@@ -72,9 +68,7 @@ def expire_offers_job(skip_order_id: int | None = None):
     for offer in expired:
         offer.status = DriverOffer.STATUS_EXPIRED
         order = offer.order
-        if order and order.driver_id == offer.driver_id and order.status == Order.STATUS_ASSIGNED:
-            order.driver_id = None
-            order.status = Order.STATUS_READY
+        if order:
             expired_order_ids.add(order.id)
     if expired:
         db.session.commit()
@@ -130,24 +124,16 @@ def dispatch_order(
     ).filter(DriverOffer.expires_at > datetime.utcnow()).first()
     if pending:
         return {"order": order, "offer": pending, "status": "offered"}
-    if order.status not in (Order.STATUS_READY, Order.STATUS_NEEDS_REASSIGN):
-        return {"order": order, "offer": None, "error": "Order not in Ready or NeedsReassign"}
+    if order.status != Order.STATUS_READY:
+        return {"order": order, "offer": None, "error": "Order not ready"}
     pickup_lat, pickup_lng = _order_pickup_lat_lng(order)
     if pickup_lat is None or pickup_lng is None:
-        order.status = Order.STATUS_NEEDS_REASSIGN
-        db.session.commit()
-        return {"order": order, "offer": None, "status": "needs_reassign", "error": "No pickup location"}
+        return {"order": order, "offer": None, "status": "no_pickup", "error": "No pickup location"}
     already = _already_offered_driver_ids(order_id)
     if len(already) >= max_attempts:
-        order.status = Order.STATUS_NEEDS_REASSIGN
-        order.driver_id = None
-        db.session.commit()
         return {"order": order, "offer": None, "status": "needs_reassign", "attempts": len(already)}
     candidates = find_nearest_drivers(pickup_lat, pickup_lng, limit=max_attempts - len(already), max_radius_km=max_radius_km, exclude_driver_ids=already)
     if not candidates:
-        order.status = Order.STATUS_NEEDS_REASSIGN
-        order.driver_id = None
-        db.session.commit()
         return {"order": order, "offer": None, "status": "needs_reassign"}
     driver, _ = candidates[0]
     offer = create_offer(order_id, driver.id, ttl_seconds=OFFER_TTL_SECONDS)

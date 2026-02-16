@@ -168,9 +168,10 @@ def force_cancel(order_id):
     order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
-    if order.status == Order.STATUS_DELIVERED:
-        return error("Cannot cancel delivered order", 400)
-    order.status = Order.STATUS_CANCELLED
+    try:
+        set_order_status(order, Order.STATUS_CANCELLED, actor="admin")
+    except OrderStatusError as e:
+        return error(str(e), 400)
     order.driver_id = None
     db.session.commit()
     return ok(_order_to_json(order))
@@ -182,11 +183,13 @@ def reassign_order(order_id):
     order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
-    if order.status not in (Order.STATUS_READY, Order.STATUS_ASSIGNED, Order.STATUS_NEEDS_REASSIGN):
-        return error("Order must be Ready, Assigned or NeedsReassign to reassign", 400)
+    if order.status not in (Order.STATUS_READY, Order.STATUS_ASSIGNED):
+        return error("Order must be ready or assigned to reassign", 400)
     order.driver_id = None
-    order.status = Order.STATUS_READY
-    db.session.commit()
+    try:
+        set_order_status(order, Order.STATUS_READY, actor="admin")
+    except OrderStatusError as e:
+        return error(str(e), 400)
     result = dispatch_order(order_id)
     out = {"order": _order_to_json(result["order"]) if result.get("order") else None}
     if result.get("offer"):

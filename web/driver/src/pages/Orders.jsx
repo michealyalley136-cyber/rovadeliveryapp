@@ -226,7 +226,7 @@ const Orders = () => {
             onClick={() => setAutoRefreshEnabled((prev) => !prev)}
             className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.2em] transition ${
               autoRefreshEnabled
-                ? 'border-rova-red/40 bg-rova-red/10 text-rova-red'
+                ? 'accent-pill'
                 : 'border-white/10 text-slate-400 hover:border-white/20'
             }`}
           >
@@ -260,7 +260,7 @@ const Orders = () => {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 transition ${
                 isActive
-                  ? 'border-rova-red/40 bg-rova-red/10 text-rova-red'
+                  ? 'accent-pill'
                   : 'border-white/10 text-slate-300 hover:border-white/20'
               }`}
             >
@@ -268,7 +268,7 @@ const Orders = () => {
               <span
                 className={`rounded-full border px-2 py-0.5 text-[10px] ${
                   isActive
-                    ? 'border-rova-red/30 bg-rova-red/20 text-rova-red'
+                    ? 'accent-pill'
                     : 'border-white/10 text-slate-400'
                 }`}
               >
@@ -279,7 +279,7 @@ const Orders = () => {
         })}
       </div>
 
-      <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="rova-card glass rounded-2xl p-6 space-y-4">
         {loading ? (
           <div className="text-sm text-slate-400">Loading orders...</div>
         ) : visibleOrders.length === 0 ? (
@@ -372,7 +372,7 @@ const Orders = () => {
                       <button
                         onClick={() => completeOrder(o)}
                         disabled={Boolean(isLoading)}
-                        className="rounded-lg border border-rova-red/40 px-3 py-1.5 text-xs text-rova-red hover:border-rova-red disabled:opacity-60"
+                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
                         {isLoading ? 'Completing...' : 'Complete'}
                       </button>

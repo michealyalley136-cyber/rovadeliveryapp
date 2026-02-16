@@ -46,11 +46,11 @@ export const Layout = () => {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="glass w-56 shrink-0 border-r border-white/10 px-4 py-6">
+      <aside className="rova-card glass w-56 shrink-0 border-r border-white/10 px-4 py-6">
         <div className="mb-10">
           <div className="text-xs uppercase tracking-[0.3em] text-slate-400">ROVA</div>
           <div className="mt-2 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-rova-red/70" />
+            <span className="accent-dot h-2 w-2 rounded-full" />
             <div className="text-lg font-semibold">{driverName || 'Driver'}</div>
           </div>
           <div className="text-xs text-slate-400">ID #{driverId || '-'}</div>
@@ -61,7 +61,7 @@ export const Layout = () => {
             className={({ isActive }) =>
               `rounded-lg px-3 py-2 text-sm transition ${
                 isActive
-                  ? 'border border-rova-red/30 bg-rova-red/10 text-rova-red'
+                  ? 'accent-pill'
                   : 'text-slate-300 hover:bg-white/5'
               }`
             }

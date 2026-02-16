@@ -65,8 +65,8 @@ def vendor_ready(order_id):
         return error("Order not found", 404)
     if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED):
         return error("Order cannot be set Ready in current state", 400)
-    if order.status not in (Order.STATUS_ACCEPTED, Order.STATUS_PREPARING):
-        return error("Order must be Accepted or Preparing before Ready", 400)
+    if order.status not in (Order.STATUS_PREPARING,):
+        return error("Order must be preparing before ready", 400)
     try:
         set_order_status(order, Order.STATUS_READY, actor="vendor")
     except OrderStatusError as e:

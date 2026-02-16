@@ -119,7 +119,7 @@ const Menu = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-        <div className="glass rounded-2xl p-6 space-y-4">
+        <div className="rova-card glass rounded-2xl p-6 space-y-4">
           {loading ? (
             <div className="text-sm text-slate-400">Loading menu...</div>
           ) : menu.length === 0 ? (
@@ -154,7 +154,7 @@ const Menu = () => {
           )}
         </div>
 
-        <div className="glass rounded-2xl p-6 space-y-4">
+        <div className="rova-card glass rounded-2xl p-6 space-y-4">
           <div className="text-sm font-semibold">Your cart</div>
           {cart.length === 0 ? (
             <div className="text-sm text-slate-400">No items yet.</div>

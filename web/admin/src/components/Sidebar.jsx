@@ -10,7 +10,7 @@ const navItems = [
 
 export const Sidebar = () => {
   return (
-    <aside className="glass h-full w-64 shrink-0 border-r border-white/10 px-4 py-6">
+    <aside className="rova-card glass h-full w-64 shrink-0 border-r border-white/10 px-4 py-6">
       <div className="mb-10">
         <div className="text-xs uppercase tracking-[0.3em] text-slate-400">ROVA</div>
         <div className="text-xl font-semibold">Admin Console</div>
@@ -23,7 +23,7 @@ export const Sidebar = () => {
             className={({ isActive }) =>
               `rounded-lg px-3 py-2 text-sm transition ${
                 isActive
-                  ? 'border border-rova-red/30 bg-rova-red/10 text-rova-red'
+                  ? 'accent-pill'
                   : 'text-slate-300 hover:bg-white/5'
               }`
             }

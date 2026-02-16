@@ -9,7 +9,7 @@ from werkzeug.security import check_password_hash
 from ..extensions import db
 from ..models import Driver, Order, DriverOffer
 from ..services.dispatch import expire_offers_job, try_next_driver_after_decline_or_expire
-from ..services.order_state import set_order_status, OrderStatusError
+from ..services.order_state import set_order_status, OrderStatusError, normalize_status
 from ..utils.authz import require_role
 from ..utils.responses import ok, error
 
@@ -63,6 +63,27 @@ def _append_note(order: Order, line: str) -> None:
         order.notes = f"{order.notes}\n{line}"
     else:
         order.notes = line
+
+
+def _assign_order_atomic(order_id: int, driver_id: int) -> bool:
+    """Atomic assignment: set status=assigned + driver_id if order is ready and unassigned."""
+    now = datetime.utcnow()
+    updated = (
+        Order.query.filter_by(id=order_id, status=Order.STATUS_READY, driver_id=None)
+        .update(
+            {
+                "status": Order.STATUS_ASSIGNED,
+                "driver_id": driver_id,
+                "assigned_at": now,
+            },
+            synchronize_session=False,
+        )
+    )
+    if updated == 0:
+        db.session.rollback()
+        return False
+    db.session.commit()
+    return True
 
 
 def _driver_public_json(d: Driver) -> dict:
@@ -267,11 +288,10 @@ def me_accept_offer(offer_id):
             offer.order.status = Order.STATUS_READY
         db.session.commit()
         return error("Offer expired", 400)
-    offer.status = DriverOffer.STATUS_ACCEPTED
     order = offer.order
-    if order:
-        order.driver_id = did
-        order.status = Order.STATUS_ASSIGNED
+    if order and not _assign_order_atomic(order.id, did):
+        return error("Order already assigned", 409)
+    offer.status = DriverOffer.STATUS_ACCEPTED
     db.session.commit()
     return ok(_offer_to_json(DriverOffer.query.get(offer_id)))
 
@@ -290,10 +310,6 @@ def me_decline_offer(offer_id):
         offer.status = DriverOffer.STATUS_EXPIRED
     else:
         offer.status = DriverOffer.STATUS_DECLINED
-    order = offer.order
-    if order and order.driver_id == did:
-        order.driver_id = None
-        order.status = Order.STATUS_READY
     db.session.commit()
     result = try_next_driver_after_decline_or_expire(offer.order_id)
     return ok({"declined": True, "next_offered": result.get("offer") is not None})
@@ -328,9 +344,9 @@ def list_ready_orders():
     return ok({"orders": [_driver_order_json(o) for o in orders]})
 
 
-@driver_bp.route("/orders/<int:order_id>/claim", methods=["POST"])
+@driver_bp.route("/orders/<int:order_id>/accept", methods=["POST"])
 @require_role("driver")
-def claim_order(order_id: int):
+def accept_order(order_id: int):
     did = _get_driver_id_from_jwt()
     if not did:
         return error("Invalid driver token", 403)
@@ -338,20 +354,22 @@ def claim_order(order_id: int):
     if not driver or not driver.driver_is_active:
         return error("Driver not found", 404)
 
-    order = Order.query.filter_by(id=order_id).first()
-    if not order:
-        return error("Order not found", 404)
-    if order.status != Order.STATUS_READY:
-        return error("Order is not READY", 409)
-    if order.driver_id is not None:
+    if not _assign_order_atomic(order_id, did):
         return error("Order already assigned", 409)
 
-    order.driver_id = did
-    order.status = Order.STATUS_ASSIGNED
-    order.driver_assigned_at = datetime.utcnow()
-    _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} claimed order")
-    db.session.commit()
-    return ok(_driver_order_json(order))
+    order = Order.query.get(order_id)
+    if order:
+        _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} accepted order")
+        db.session.commit()
+        return ok(_driver_order_json(order))
+    return error("Order not found", 404)
+
+
+# Backward compatibility
+@driver_bp.route("/orders/<int:order_id>/claim", methods=["POST"])
+@require_role("driver")
+def claim_order(order_id: int):
+    return accept_order(order_id)
 
 
 @driver_bp.route("/orders/active", methods=["GET"])
@@ -361,14 +379,28 @@ def list_active_orders():
     if not did:
         return error("Invalid driver token", 403)
     orders = (
-        Order.query.filter_by(driver_id=did, status=Order.STATUS_ASSIGNED)
+        Order.query.filter(Order.driver_id == did, Order.status.in_([Order.STATUS_ASSIGNED, Order.STATUS_PICKED_UP]))
         .order_by(Order.created_at.desc())
         .all()
     )
     return ok({"orders": [_driver_order_json(o) for o in orders]})
 
 
-@driver_bp.route("/orders/<int:order_id>/status", methods=["PATCH"])
+@driver_bp.route("/orders/completed", methods=["GET"])
+@require_role("driver")
+def list_completed_orders():
+    did = _get_driver_id_from_jwt()
+    if not did:
+        return error("Invalid driver token", 403)
+    orders = (
+        Order.query.filter(Order.driver_id == did, Order.status == Order.STATUS_DELIVERED)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+    return ok({"orders": [_driver_order_json(o) for o in orders]})
+
+
+@driver_bp.route("/orders/<int:order_id>/status", methods=["POST", "PATCH"])
 @require_role("driver")
 def update_order_status_driver(order_id: int):
     did = _get_driver_id_from_jwt()
@@ -378,15 +410,21 @@ def update_order_status_driver(order_id: int):
     if not order:
         return error("Order not found", 404)
     data = request.get_json() or {}
-    requested = (data.get("status") or "").strip().upper()
-    if requested != "COMPLETED":
-        return error("status must be COMPLETED", 400)
-    if order.status != Order.STATUS_ASSIGNED:
-        return error("Order must be ASSIGNED to complete", 409)
+    requested = (data.get("next_status") or data.get("status") or "").strip()
+    if not requested:
+        return error("Missing next_status", 400)
+    try:
+        next_status = normalize_status(requested)
+    except OrderStatusError as e:
+        return error(str(e), 400)
+    if next_status not in (Order.STATUS_PICKED_UP, Order.STATUS_DELIVERED):
+        return error("next_status must be picked_up or delivered", 400)
 
-    order.status = Order.STATUS_DELIVERED
-    order.delivered_at = datetime.utcnow()
-    _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} completed order")
+    try:
+        set_order_status(order, next_status, actor="driver")
+    except OrderStatusError as e:
+        return error(str(e), 409)
+    _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} -> {next_status}")
     db.session.commit()
     return ok(_driver_order_json(order))
 

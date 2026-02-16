@@ -102,7 +102,7 @@ const Checkout = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <form onSubmit={submit} className="glass rounded-2xl p-6 space-y-4">
+        <form onSubmit={submit} className="rova-card glass rounded-2xl p-6 space-y-4">
           <div className="grid gap-3">
             <label className="text-xs text-slate-400">
               Full name
@@ -149,7 +149,7 @@ const Checkout = () => {
           </button>
         </form>
 
-        <div className="glass rounded-2xl p-6 space-y-4">
+        <div className="rova-card glass rounded-2xl p-6 space-y-4">
           <div className="text-sm font-semibold">Order summary</div>
           {cart.length === 0 ? (
             <div className="text-sm text-slate-400">No items in cart.</div>

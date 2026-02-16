@@ -273,7 +273,7 @@ const Orders = () => {
             onClick={() => setAutoRefreshEnabled((prev) => !prev)}
             className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.2em] transition ${
               autoRefreshEnabled
-                ? 'border-rova-red/40 bg-rova-red/10 text-rova-red'
+                ? 'accent-pill'
                 : 'border-white/10 text-slate-400 hover:border-white/20'
             }`}
           >
@@ -307,7 +307,7 @@ const Orders = () => {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 transition ${
                 isActive
-                  ? 'border-rova-red/40 bg-rova-red/10 text-rova-red'
+                  ? 'accent-pill'
                   : 'border-white/10 text-slate-300 hover:border-white/20'
               }`}
             >
@@ -315,7 +315,7 @@ const Orders = () => {
               <span
                 className={`rounded-full border px-2 py-0.5 text-[10px] ${
                   isActive
-                    ? 'border-rova-red/30 bg-rova-red/20 text-rova-red'
+                    ? 'accent-pill'
                     : 'border-white/10 text-slate-400'
                 }`}
               >
@@ -326,7 +326,7 @@ const Orders = () => {
         })}
       </div>
 
-      <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="rova-card glass rounded-2xl p-6 space-y-4">
         {loading ? (
           <div className="text-sm text-slate-400">Loading orders...</div>
         ) : visibleOrders.length === 0 ? (
@@ -424,7 +424,7 @@ const Orders = () => {
                       <button
                         onClick={() => updateStatus(o, 'READY')}
                         disabled={Boolean(isActionLoading)}
-                        className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
+                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
                         {isActionLoading ? 'Updating...' : 'Mark Ready'}
                       </button>
@@ -433,7 +433,7 @@ const Orders = () => {
                       <button
                         onClick={() => updateStatus(o, 'COMPLETED')}
                         disabled={Boolean(isActionLoading)}
-                        className="rounded-lg border border-rova-red/40 px-3 py-1.5 text-xs text-rova-red hover:border-rova-red disabled:opacity-60"
+                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
                         {isActionLoading ? 'Updating...' : 'Complete'}
                       </button>
@@ -457,7 +457,7 @@ const Orders = () => {
 
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
-          <div className="glass w-full max-w-2xl rounded-2xl p-6">
+          <div className="rova-card glass w-full max-w-2xl rounded-2xl p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Order</div>
@@ -537,7 +537,7 @@ const Orders = () => {
                         <button
                           onClick={() => updateStatus(selectedOrder, 'READY')}
                           disabled={Boolean(isActionLoading)}
-                          className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
+                          className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                         >
                           {isActionLoading ? 'Updating...' : 'Mark Ready'}
                         </button>
@@ -546,7 +546,7 @@ const Orders = () => {
                         <button
                           onClick={() => updateStatus(selectedOrder, 'COMPLETED')}
                           disabled={Boolean(isActionLoading)}
-                          className="rounded-lg border border-rova-red/40 px-3 py-1.5 text-xs text-rova-red hover:border-rova-red disabled:opacity-60"
+                          className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                         >
                           {isActionLoading ? 'Updating...' : 'Complete'}
                         </button>

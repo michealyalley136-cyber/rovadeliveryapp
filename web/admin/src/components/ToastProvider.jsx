@@ -30,12 +30,8 @@ export const ToastProvider = ({ children }) => {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`glass rounded-lg px-4 py-3 text-sm shadow-lg border ${
-              t.type === 'error'
-                ? 'border-rova-red/60 text-rova-red'
-                : t.type === 'success'
-                ? 'border-rova-red/40 text-white'
-                : 'border-white/10 text-slate-200'
+            className={`rova-card glass toast rounded-lg px-4 py-3 text-sm shadow-lg ${
+              t.type === 'error' ? 'toast-error' : t.type === 'success' ? 'toast-success' : 'toast-info'
             }`}
           >
             {t.message}

@@ -52,7 +52,7 @@ const OrderDetail = () => {
     return (
       <div className="space-y-6">
         <Topbar title="Order detail" />
-        <div className="glass rounded-2xl p-6 text-sm text-slate-400">Loading...</div>
+        <div className="rova-card glass rounded-2xl p-6 text-sm text-slate-400">Loading...</div>
       </div>
     );
   }
@@ -61,7 +61,7 @@ const OrderDetail = () => {
     return (
       <div className="space-y-6">
         <Topbar title="Order detail" />
-        <div className="glass rounded-2xl p-6 text-sm text-slate-400">Order not found.</div>
+        <div className="rova-card glass rounded-2xl p-6 text-sm text-slate-400">Order not found.</div>
       </div>
     );
   }
@@ -73,7 +73,7 @@ const OrderDetail = () => {
     <div className="space-y-6">
       <Topbar title={`Order #${order.id}`} />
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="glass rounded-2xl p-6 lg:col-span-2">
+        <div className="rova-card glass rounded-2xl p-6 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-slate-400">Status</div>
@@ -128,19 +128,19 @@ const OrderDetail = () => {
             </button>
             <button
               onClick={() => act(`/admin/orders/${order.id}/set-ready`)}
-              className="btn-primary rounded-lg px-4 py-2 text-xs"
+              className="btn-secondary rounded-lg px-4 py-2 text-xs"
             >
               Set Ready
             </button>
             <button
               onClick={() => act(`/admin/orders/${order.id}/cancel`)}
-              className="rounded-lg border border-rova-red/50 px-4 py-2 text-xs text-rova-red hover:border-rova-red"
+              className="btn-primary rounded-lg px-4 py-2 text-xs"
             >
               Cancel
             </button>
             <button
               onClick={() => act(`/admin/orders/${order.id}/reassign`)}
-              className="rounded-lg border border-rova-red/40 px-4 py-2 text-xs text-rova-red hover:border-rova-red"
+              className="btn-primary rounded-lg px-4 py-2 text-xs"
             >
               Reassign
             </button>
@@ -156,27 +156,27 @@ const OrderDetail = () => {
         </div>
 
         <div className="space-y-6">
-          <div className="glass rounded-2xl p-6">
+          <div className="rova-card glass rounded-2xl p-6">
             <div className="text-sm text-slate-400">Vendor</div>
             <div className="mt-2 text-base font-semibold">{vendor.name || 'Vendor'}</div>
             <div className="mt-2 text-xs text-slate-400">Type: {vendor.vendor_type || 'N/A'}</div>
-            <div className="text-xs text-slate-400">WhatsApp: {vendor.whatsapp_number || '—'}</div>
-            <div className="text-xs text-slate-400">Lat/Lng: {vendor.lat ?? '—'}, {vendor.lng ?? '—'}</div>
+            <div className="text-xs text-slate-400">WhatsApp: {vendor.whatsapp_number || '-'}</div>
+            <div className="text-xs text-slate-400">Lat/Lng: {vendor.lat ?? '-'}, {vendor.lng ?? '-'}</div>
           </div>
-          <div className="glass rounded-2xl p-6">
+          <div className="rova-card glass rounded-2xl p-6">
             <div className="text-sm text-slate-400">Driver</div>
             <div className="mt-2 text-base font-semibold">{driver.full_name || 'Unassigned'}</div>
-            <div className="mt-2 text-xs text-slate-400">Phone: {driver.phone || '—'}</div>
+            <div className="mt-2 text-xs text-slate-400">Phone: {driver.phone || '-'}</div>
             <div className="text-xs text-slate-400">Online: {driver.is_online ? 'Yes' : 'No'}</div>
             <div className="text-xs text-slate-400">
-              Location: {driver.last_known_lat ?? '—'}, {driver.last_known_lng ?? '—'}
+              Location: {driver.last_known_lat ?? '-'}, {driver.last_known_lng ?? '-'}
             </div>
           </div>
-          <div className="glass rounded-2xl p-6">
+          <div className="rova-card glass rounded-2xl p-6">
             <div className="text-sm text-slate-400">Dropoff</div>
-            <div className="mt-2 text-sm">{order.dropoff?.address_text || '—'}</div>
+            <div className="mt-2 text-sm">{order.dropoff?.address_text || '-'}</div>
             <div className="text-xs text-slate-400">
-              Lat/Lng: {order.dropoff?.lat ?? '—'}, {order.dropoff?.lng ?? '—'}
+              Lat/Lng: {order.dropoff?.lat ?? '-'}, {order.dropoff?.lng ?? '-'}
             </div>
           </div>
         </div>

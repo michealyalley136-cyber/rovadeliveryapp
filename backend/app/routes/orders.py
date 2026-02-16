@@ -1,5 +1,6 @@
 """Orders: create, list, get (track status)."""
 import json
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
@@ -14,7 +15,7 @@ from ..services.pricing import (
     get_active_pricing_config,
     compute_delivery_fee,
 )
-from ..services.order_state import set_order_status, OrderStatusError
+from ..services.order_state import set_order_status, OrderStatusError, normalize_status
 from ..utils.responses import ok, error
 from ..utils.validators import validate_required, validate_positive_int
 
@@ -22,18 +23,10 @@ orders_bp = Blueprint("orders", __name__)
 
 
 def _canonical_status(status: str) -> str:
-    mapping = {
-        Order.STATUS_CREATED: "NEW",
-        Order.STATUS_SENT_TO_VENDOR: "NEW",
-        Order.STATUS_ACCEPTED: "PREPARING",
-        Order.STATUS_PREPARING: "PREPARING",
-        Order.STATUS_READY: "READY",
-        Order.STATUS_ASSIGNED: "ASSIGNED",
-        Order.STATUS_PICKED_UP: "ASSIGNED",
-        Order.STATUS_DELIVERED: "COMPLETED",
-        Order.STATUS_CANCELLED: "CANCELLED",
-    }
-    return mapping.get(status, status or "UNKNOWN")
+    try:
+        return normalize_status(status)
+    except Exception:
+        return status or "unknown"
 
 
 def _vendor_to_json(v: Vendor) -> dict:
@@ -74,11 +67,11 @@ def _order_to_json(o, *, include_vendor=False, include_driver=False, include_add
         "vendor_id": o.vendor_id,
         "delivery_address_id": o.delivery_address_id,
         "status": o.status,
-        "status_canonical": _canonical_status(o.status),
         "subtotal_cents": o.subtotal_cents,
         "delivery_fee_cents": o.delivery_fee_cents,
         "total_cents": o.total_cents,
         "created_at": o.created_at.isoformat() if o.created_at else None,
+        "placed_at": o.placed_at.isoformat() if o.placed_at else None,
         "offer_expires_at": o.offer_expires_at.isoformat() if o.offer_expires_at else None,
         "notes": o.notes,
         "customer_name": o.customer_name,
@@ -235,7 +228,7 @@ def create_order():
             customer_id=uid,
             vendor_id=vendor.id,
             delivery_address_id=addr.id,
-            status=Order.STATUS_CREATED,
+            status=Order.STATUS_NEW,
             subtotal_cents=subtotal_cents,
             delivery_fee_cents=delivery_fee_cents,
             total_cents=total_cents,
@@ -245,6 +238,7 @@ def create_order():
             total_ghs=total_ghs,
             notes=(data.get("notes") or "").strip() or None,
             order_public_token=uuid4().hex,
+            placed_at=datetime.utcnow(),
         )
         db.session.add(order)
         db.session.flush()
@@ -338,7 +332,7 @@ def create_order():
         customer_id=uid,
         vendor_id=vendor.id,
         delivery_address_id=addr.id,
-        status=Order.STATUS_CREATED,
+        status=Order.STATUS_NEW,
         subtotal_cents=subtotal_cents,
         delivery_fee_cents=delivery_fee_cents,
         total_cents=total_cents,
@@ -351,13 +345,14 @@ def create_order():
         customer_phone=customer_phone,
         order_public_token=uuid4().hex,
         items_snapshot=json.dumps(normalized_items),
+        placed_at=datetime.utcnow(),
     )
     db.session.add(order)
     db.session.commit()
 
     return ok({
         "order_id": order.id,
-        "status": _canonical_status(order.status),
+        "status": order.status,
         "total": float(total_ghs),
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "token": order.order_public_token,
@@ -396,15 +391,19 @@ def get_order(order_id):
             return error("Invalid or missing token", 403)
 
     driver = order.driver if order.driver_id else None
-    timeline = [
-        {"status": "NEW", "timestamp": order.created_at.isoformat() if order.created_at else None},
-    ]
-    if order.vendor_accepted_at:
-        timeline.append({"status": "PREPARING", "timestamp": order.vendor_accepted_at.isoformat()})
-    if order.driver_assigned_at:
-        timeline.append({"status": "ASSIGNED", "timestamp": order.driver_assigned_at.isoformat()})
+    timeline = []
+    if order.placed_at or order.created_at:
+        timeline.append({"status": "new", "timestamp": (order.placed_at or order.created_at).isoformat()})
+    if order.prepared_at:
+        timeline.append({"status": "preparing", "timestamp": order.prepared_at.isoformat()})
+    if order.assigned_at:
+        timeline.append({"status": "assigned", "timestamp": order.assigned_at.isoformat()})
+    if order.picked_up_at:
+        timeline.append({"status": "picked_up", "timestamp": order.picked_up_at.isoformat()})
     if order.delivered_at:
-        timeline.append({"status": "COMPLETED", "timestamp": order.delivered_at.isoformat()})
+        timeline.append({"status": "delivered", "timestamp": order.delivered_at.isoformat()})
+    if order.cancelled_at:
+        timeline.append({"status": "cancelled", "timestamp": order.cancelled_at.isoformat()})
 
     items = [
         {
@@ -422,7 +421,7 @@ def get_order(order_id):
 
     return ok({
         "id": order.id,
-        "status": _canonical_status(order.status),
+        "status": order.status,
         "status_raw": order.status,
         "totals": {
             "items_subtotal": round(order.subtotal_cents / 100.0, 2),
@@ -469,16 +468,17 @@ def update_order_status(order_id):
     if not order:
         return error("Order not found", 404)
     data = request.get_json() or {}
-    status = (data.get("status") or "").upper()
+    status = (data.get("next_status") or data.get("status") or "").strip()
     try:
-        if status == "PICKED_UP":
-            set_order_status(order, Order.STATUS_PICKED_UP, actor="driver")
-        elif status == "DELIVERED":
-            set_order_status(order, Order.STATUS_DELIVERED, actor="driver")
-        else:
-            return error("status must be PICKED_UP or DELIVERED", 400)
+        next_status = normalize_status(status)
     except OrderStatusError as e:
         return error(str(e), 400)
+    if next_status not in (Order.STATUS_PICKED_UP, Order.STATUS_DELIVERED):
+        return error("next_status must be picked_up or delivered", 400)
+    try:
+        set_order_status(order, next_status, actor="driver")
+    except OrderStatusError as e:
+        return error(str(e), 409)
     return ok(_order_to_json(
         order,
         include_vendor=True,

@@ -113,17 +113,17 @@ const OrderTracking = () => {
     <div className="space-y-6">
       <div>
         <Link to="/" className="text-xs text-slate-400 hover:text-white">
-          ← Back to vendors
+          {'\u2190'} Back to vendors
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">Track your order</h1>
         <p className="text-sm text-slate-400">Order #{id}</p>
       </div>
 
-      <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="rova-card glass rounded-2xl p-6 space-y-4">
         {loading ? (
           <div className="text-sm text-slate-400">Loading order status...</div>
         ) : error ? (
-          <div className="rounded-lg border border-rova-red/40 bg-rova-red/10 px-4 py-3 text-sm">
+          <div className="alert-error rounded-lg px-4 py-3 text-sm">
             {error}
           </div>
         ) : (

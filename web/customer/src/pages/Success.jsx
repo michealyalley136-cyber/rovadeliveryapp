@@ -24,7 +24,7 @@ const Success = () => {
           <h1 className="text-2xl font-semibold">Order not found</h1>
           <p className="text-sm text-slate-400">We could not find a recent order to display.</p>
         </div>
-        <div className="glass rounded-2xl p-6">
+        <div className="rova-card glass rounded-2xl p-6">
           <button
             onClick={() => navigate('/')}
             className="btn-primary rounded-lg px-4 py-2 text-sm"
@@ -44,7 +44,7 @@ const Success = () => {
         <p className="text-sm text-slate-400">Order #{orderId} has been placed.</p>
       </div>
 
-      <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="rova-card glass rounded-2xl p-6 space-y-4">
         <div className="text-sm font-semibold">Track your delivery</div>
         <div className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300">
           {trackingUrl}

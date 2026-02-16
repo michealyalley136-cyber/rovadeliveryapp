@@ -61,7 +61,7 @@ const SelectVendor = () => {
           </div>
         </div>
 
-        <div className="glass rounded-2xl p-6">
+        <div className="rova-card glass rounded-2xl p-6">
           {loading ? (
             <div className="text-sm text-slate-400">Loading vendors...</div>
           ) : filtered.length === 0 ? (

@@ -7,7 +7,7 @@ export const Layout = () => {
 
   return (
     <div className="min-h-screen">
-      <header className="glass border-b border-white/10">
+      <header className="rova-card glass border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="text-xs uppercase tracking-[0.3em] text-slate-400">ROVA</div>
@@ -17,7 +17,7 @@ export const Layout = () => {
             <Link
               to="/"
               className={`rounded-lg px-3 py-2 transition ${
-                isActive('/') ? 'bg-rova-red/10 text-rova-red' : 'text-slate-300 hover:text-white'
+                isActive('/') ? 'accent-pill' : 'text-slate-300 hover:text-white'
               }`}
             >
               Vendors

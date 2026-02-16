@@ -34,7 +34,7 @@ const Drivers = () => {
   return (
     <div className="space-y-6">
       <Topbar title="Drivers" />
-      <div className="glass rounded-2xl p-6 space-y-4">
+      <div className="rova-card glass rounded-2xl p-6 space-y-4">
         {drivers.map((d) => (
           <div key={d.id} className="rounded-xl border border-white/5 p-4">
             <div className="flex items-center justify-between">
@@ -47,14 +47,14 @@ const Drivers = () => {
                   Location: {d.last_known_lat ?? '—'}, {d.last_known_lng ?? '—'}
                 </div>
               </div>
-              {!d.approved && (
-                <button
-                  onClick={() => approve(d.id)}
-                  className="btn-primary rounded-lg px-3 py-1.5 text-xs"
-                >
-                  Approve
-                </button>
-              )}
+                {!d.approved && (
+                  <button
+                    onClick={() => approve(d.id)}
+                    className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
+                  >
+                    Approve
+                  </button>
+                )}
             </div>
           </div>
         ))}

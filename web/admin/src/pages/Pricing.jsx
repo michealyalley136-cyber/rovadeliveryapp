@@ -47,7 +47,7 @@ const Pricing = () => {
   return (
     <div className="space-y-6">
       <Topbar title="Pricing" />
-      <div className="glass rounded-2xl p-6 space-y-4 max-w-2xl">
+      <div className="rova-card glass rounded-2xl p-6 space-y-4 max-w-2xl">
         <div className="text-sm text-slate-400">Current config</div>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="text-xs text-slate-400">

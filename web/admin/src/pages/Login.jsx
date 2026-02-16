@@ -22,7 +22,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="glass w-full max-w-md rounded-2xl p-8">
+      <div className="rova-card glass w-full max-w-md rounded-2xl p-8">
         <div className="mb-6">
           <div className="text-xs uppercase tracking-[0.3em] text-slate-400">ROVA</div>
           <h1 className="text-2xl font-semibold">Admin Login</h1>

@@ -92,7 +92,7 @@ const PinEntry = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="glass w-full max-w-md rounded-2xl p-8">
+      <div className="rova-card glass w-full max-w-md rounded-2xl p-8">
         <div className="mb-6">
           <div className="text-xs uppercase tracking-[0.3em] text-slate-400">ROVA</div>
           <h1 className="text-2xl font-semibold">Enter PIN</h1>
@@ -102,7 +102,7 @@ const PinEntry = () => {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-rova-red/40 bg-rova-red/10 px-3 py-2 text-sm text-white">
+          <div className="alert-error mb-4 rounded-lg px-3 py-2 text-sm">
             {error}
             <div className="mt-2">
               <button
@@ -111,7 +111,7 @@ const PinEntry = () => {
                   setError('');
                   clearPersistentError();
                 }}
-                className="rounded-lg border border-rova-red/40 px-3 py-1 text-xs text-rova-red hover:border-rova-red"
+                className="alert-error-btn rounded-lg px-3 py-1 text-xs"
               >
                 Try again
               </button>

@@ -49,7 +49,7 @@ const Orders = () => {
   return (
     <div className="space-y-6">
       <Topbar title="Orders" />
-      <div className="glass rounded-2xl p-6">
+      <div className="rova-card glass rounded-2xl p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <div className="text-sm text-slate-400">Recent orders</div>
