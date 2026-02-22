@@ -73,8 +73,13 @@ const PinEntry = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiPost(`/drivers/${driverId}/verify-pin`, { pin: trimmed }, { auth: false });
-      setDriverSession(data.token, data.driverId || driverId, data.driverName);
+      const data = await apiPost(
+        `/driver/auth/pin`,
+        { driver_id: driverId, pin: trimmed },
+        { auth: false }
+      );
+      const driver = data.driver || {};
+      setDriverSession(data.token, driver.id || driverId, driver.name || driverName);
       clearPersistentError();
       navigate('/driver/dashboard');
     } catch (e) {

@@ -1,23 +1,36 @@
 import React from 'react';
 
 const canonicalStatus = (status) => {
+  if (!status) return 'UNKNOWN';
+  const key = status.toString().trim().toLowerCase().replace(/\s+/g, '_');
   const map = {
-    Created: 'NEW',
-    SentToVendor: 'NEW',
-    Accepted: 'PREPARING',
-    Preparing: 'PREPARING',
-    Ready: 'READY',
-    Assigned: 'ASSIGNED',
-    PickedUp: 'ASSIGNED',
-    Delivered: 'COMPLETED',
-    Cancelled: 'CANCELLED',
+    created: 'NEW',
+    sent_to_vendor: 'NEW',
+    senttovendor: 'NEW',
+    new: 'NEW',
+    accepted: 'PREPARING',
+    preparing: 'PREPARING',
+    ready: 'READY',
+    assigned: 'ASSIGNED',
+    picked_up: 'ASSIGNED',
+    pickedup: 'ASSIGNED',
+    delivered: 'COMPLETED',
+    completed: 'COMPLETED',
+    cancelled: 'CANCELLED',
+    canceled: 'CANCELLED',
+    needs_reassign: 'READY',
   };
-  return map[status] || status || 'UNKNOWN';
+  return map[key] || 'UNKNOWN';
 };
 
 const labelForStatus = (status) => {
-  const canonical = canonicalStatus(status);
-  return canonical.charAt(0) + canonical.slice(1).toLowerCase();
+  if (!status) return 'Unknown';
+  return status
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 export const StatusChip = ({ status }) => {

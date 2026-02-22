@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { getDriverId, getDriverToken } from './api/client';
+import BackendStatusBanner from './components/BackendStatusBanner';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/ToastProvider';
 import PinEntry from './pages/PinEntry';
@@ -18,6 +19,7 @@ const RequireDriver = ({ children }) => {
 const App = () => {
   return (
     <ToastProvider>
+      <BackendStatusBanner />
       <Routes>
         <Route path="/" element={<Navigate to="/driver/select" replace />} />
         <Route path="/driver/select" element={<SelectDriver />} />

@@ -1,9 +1,10 @@
 """ROVA Flask application factory."""
 import os
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from .config import config_by_name
 from .extensions import db, jwt, migrate
+from .utils.responses import error
 
 
 def create_app(config_name=None):
@@ -15,7 +16,29 @@ def create_app(config_name=None):
     jwt.init_app(app)
     migrate.init_app(app, db)
 
-    cors_origins = [
+    @jwt.unauthorized_loader
+    def _jwt_unauthorized(_reason):
+        return error("Authorization required", 401)
+
+    @jwt.invalid_token_loader
+    def _jwt_invalid(_reason):
+        return error("Invalid token", 401)
+
+    @jwt.expired_token_loader
+    def _jwt_expired(_header, _payload):
+        return error("Token has expired", 401)
+
+    @jwt.needs_fresh_token_loader
+    def _jwt_needs_fresh(_header, _payload):
+        return error("Fresh token required", 401)
+
+    @jwt.revoked_token_loader
+    def _jwt_revoked(_header, _payload):
+        return error("Token has been revoked", 401)
+
+    env_name = os.getenv("FLASK_ENV") or os.getenv("ENV") or "development"
+    is_dev = env_name == "development"
+    dev_origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
@@ -25,12 +48,24 @@ def create_app(config_name=None):
         "http://localhost:5176",
         "http://127.0.0.1:5176",
     ]
-    cors_options = {
-        "origins": cors_origins,
-        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Admin-API-Key"],
+    api_origins = dev_origins if is_dev else dev_origins
+    api_headers = ["Content-Type", "Authorization", "X-Admin-API-Key"]
+    cors_resources = {
+        r"/api/*": {
+            "origins": api_origins,
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            "allow_headers": api_headers,
+        }
     }
-    CORS(app, resources={r"/api/*": cors_options, r"/health": cors_options})
+    if is_dev:
+        cors_resources[r"/health"] = {"origins": "*"}
+    else:
+        cors_resources[r"/health"] = {
+            "origins": api_origins,
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            "allow_headers": api_headers,
+        }
+    CORS(app, resources=cors_resources)
 
     from .routes import register_blueprints
     from .routes.public import public_bp
@@ -53,5 +88,12 @@ def create_app(config_name=None):
     @app.route("/favicon.ico")
     def favicon():
         return ("", 204)
+
+    @app.route("/uploads/<path:filename>")
+    def uploads(filename):
+        upload_folder = app.config.get("UPLOAD_FOLDER")
+        if not upload_folder:
+            return ("", 404)
+        return send_from_directory(upload_folder, filename)
 
     return app

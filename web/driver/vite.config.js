@@ -8,5 +8,9 @@ export default defineConfig({
     host: 'localhost',
     port: 5175,
     strictPort: true,
+    proxy: {
+      '/api': 'http://localhost:5000',
+      '/health': 'http://localhost:5000',
+    },
   },
 });

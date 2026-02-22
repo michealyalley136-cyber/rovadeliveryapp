@@ -1,26 +1,35 @@
 import React from 'react';
 
 const canonicalStatus = (status) => {
+  if (!status) return 'UNKNOWN';
+  const key = status.toString().trim().toLowerCase().replace(/\s+/g, '_');
   const map = {
-    Created: 'NEW',
-    SentToVendor: 'NEW',
-    Accepted: 'PREPARING',
-    Preparing: 'PREPARING',
-    Ready: 'READY',
-    Assigned: 'ASSIGNED',
-    PickedUp: 'ASSIGNED',
-    Delivered: 'COMPLETED',
-    Cancelled: 'CANCELLED',
-    NEEDS_REASSIGN: 'CANCELLED',
-    NeedsReassign: 'CANCELLED',
+    created: 'NEW',
+    sent_to_vendor: 'NEW',
+    senttovendor: 'NEW',
+    new: 'NEW',
+    placed: 'NEW',
+    accepted: 'PREPARING',
+    preparing: 'PREPARING',
+    ready: 'READY',
+    assigned: 'ASSIGNED',
+    picked_up: 'ASSIGNED',
+    pickedup: 'ASSIGNED',
+    delivered: 'COMPLETED',
+    completed: 'COMPLETED',
+    declined: 'CANCELLED',
+    cancelled: 'CANCELLED',
+    canceled: 'CANCELLED',
+    needs_reassign: 'READY',
   };
-  return map[status] || status || 'UNKNOWN';
+  return map[key] || 'UNKNOWN';
 };
 
 const labelForStatus = (status) => {
   if (!status) return 'Unknown';
   return status
     .toString()
+    .trim()
     .toLowerCase()
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());

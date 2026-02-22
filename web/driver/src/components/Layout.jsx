@@ -32,8 +32,12 @@ export const Layout = () => {
         setDriverListCache(drivers);
         const match = drivers.find((d) => String(d.id) === String(driverId));
         setDriverName(match?.name || '');
-      } catch {
-        toast({ type: 'error', message: 'Unable to load driver details.', persist: true });
+      } catch (e) {
+        toast({
+          type: 'error',
+          message: e.message || 'Unable to load driver details.',
+          persist: true,
+        });
       }
     };
     if (driverId) loadDriver();

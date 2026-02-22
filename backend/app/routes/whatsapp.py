@@ -25,10 +25,10 @@ def vendor_accept(order_id):
     order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
-    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED):
+    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED, Order.STATUS_DECLINED):
         return error("Order cannot be accepted in current state", 400)
     try:
-        set_order_status(order, Order.STATUS_PREPARING, actor="vendor")
+        set_order_status(order, Order.STATUS_ACCEPTED, actor="vendor")
     except OrderStatusError as e:
         return error(str(e), 400)
     return ok({"order_id": order_id, "status": order.status})
@@ -40,7 +40,7 @@ def vendor_reject(order_id):
     order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
-    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED):
+    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED, Order.STATUS_DECLINED):
         return error("Order cannot be rejected in current state", 400)
     if order.status in (Order.STATUS_READY, Order.STATUS_ASSIGNED, Order.STATUS_PICKED_UP):
         return error("Order cannot be rejected after Ready/Assigned", 400)
@@ -51,9 +51,9 @@ def vendor_reject(order_id):
     if reason:
         order.notes = f"{(order.notes or '').strip()}\nRejected: {reason}".strip()
     try:
-        set_order_status(order, Order.STATUS_CANCELLED, actor="vendor")
+        set_order_status(order, Order.STATUS_DECLINED, actor="vendor")
     except OrderStatusError as e:
-        return error(str(e), 400)
+        return error(str(e), 409)
     return ok({"order_id": order_id, "status": order.status})
 
 
@@ -63,7 +63,7 @@ def vendor_ready(order_id):
     order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
-    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED):
+    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED, Order.STATUS_DECLINED):
         return error("Order cannot be set Ready in current state", 400)
     if order.status not in (Order.STATUS_PREPARING,):
         return error("Order must be preparing before ready", 400)

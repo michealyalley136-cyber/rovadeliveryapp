@@ -7,7 +7,13 @@ import { useToast } from '../components/ToastProvider';
 const Pricing = () => {
   const toast = useToast();
   const [config, setConfig] = useState(null);
-  const [form, setForm] = useState({ base_km: '', base_fee_ghs: '', per_km_fee_ghs: '' });
+  const [form, setForm] = useState({
+    base_km: '',
+    base_fee_ghs: '',
+    per_km_fee_ghs: '',
+    service_fee_percent: '',
+    minimum_service_fee_ghs: '',
+  });
 
   const load = async () => {
     try {
@@ -18,6 +24,8 @@ const Pricing = () => {
           base_km: data.config.base_km,
           base_fee_ghs: data.config.base_fee_ghs,
           per_km_fee_ghs: data.config.per_km_fee_ghs,
+          service_fee_percent: data.config.service_fee_percent ?? 0,
+          minimum_service_fee_ghs: data.config.minimum_service_fee_ghs ?? 0,
         });
       }
     } catch (e) {
@@ -35,6 +43,8 @@ const Pricing = () => {
         base_km: Number(form.base_km),
         base_fee_ghs: Number(form.base_fee_ghs),
         per_km_fee_ghs: Number(form.per_km_fee_ghs),
+        service_fee_percent: Number(form.service_fee_percent),
+        minimum_service_fee_ghs: Number(form.minimum_service_fee_ghs),
       };
       const data = await apiPatch('/admin/pricing', payload);
       setConfig(data);
@@ -71,6 +81,22 @@ const Pricing = () => {
             <input
               value={form.per_km_fee_ghs}
               onChange={(e) => setForm({ ...form, per_km_fee_ghs: e.target.value })}
+              className="mt-2 w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm focus-ring"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            Service fee (%)
+            <input
+              value={form.service_fee_percent}
+              onChange={(e) => setForm({ ...form, service_fee_percent: e.target.value })}
+              className="mt-2 w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm focus-ring"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            Minimum service fee (GHS)
+            <input
+              value={form.minimum_service_fee_ghs}
+              onChange={(e) => setForm({ ...form, minimum_service_fee_ghs: e.target.value })}
               className="mt-2 w-full rounded-lg border border-white/10 bg-transparent px-3 py-2 text-sm focus-ring"
             />
           </label>

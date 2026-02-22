@@ -1,16 +1,18 @@
 """Driver: /me/location, /me/online, /me/offers, accept/decline by offer_id, picked-up, delivered."""
-from datetime import datetime, timedelta
+from datetime import datetime
 from time import sleep, time
 
 from flask import Blueprint, request
-from flask_jwt_extended import create_access_token, get_jwt, get_jwt_identity
+from flask_jwt_extended import create_access_token, get_jwt, get_jwt_identity, jwt_required
+from sqlalchemy import or_
 from werkzeug.security import check_password_hash
 
 from ..extensions import db
 from ..models import Driver, Order, DriverOffer
 from ..services.dispatch import expire_offers_job, try_next_driver_after_decline_or_expire
-from ..services.order_state import set_order_status, OrderStatusError, normalize_status
+from ..services.order_state import OrderStatusError, normalize_status
 from ..utils.authz import require_role
+from ..utils.auth_actor import get_actor_id_or_401
 from ..utils.responses import ok, error
 
 driver_bp = Blueprint("driver", __name__)
@@ -69,12 +71,19 @@ def _assign_order_atomic(order_id: int, driver_id: int) -> bool:
     """Atomic assignment: set status=assigned + driver_id if order is ready and unassigned."""
     now = datetime.utcnow()
     updated = (
-        Order.query.filter_by(id=order_id, status=Order.STATUS_READY, driver_id=None)
+        Order.query.filter(
+            Order.id == order_id,
+            Order.status == Order.STATUS_READY,
+            Order.driver_id.is_(None),
+            or_(Order.offer_expires_at.is_(None), Order.offer_expires_at >= now),
+        )
         .update(
             {
                 "status": Order.STATUS_ASSIGNED,
                 "driver_id": driver_id,
                 "assigned_at": now,
+                "driver_status": Order.DRIVER_STATUS_ACCEPTED,
+                "offer_expires_at": None,
             },
             synchronize_session=False,
         )
@@ -98,6 +107,7 @@ def _driver_order_json(o: Order) -> dict:
     return {
         "id": o.id,
         "status": o.status,
+        "driver_status": o.driver_status,
         "vendor_id": o.vendor_id,
         "vendor_name": o.vendor.name if o.vendor else None,
         "pickup": {
@@ -113,9 +123,11 @@ def _driver_order_json(o: Order) -> dict:
         "totals": {
             "subtotal_cents": o.subtotal_cents,
             "delivery_fee_cents": o.delivery_fee_cents,
+            "service_fee_cents": o.service_fee_cents,
             "total_cents": o.total_cents,
             "subtotal_ghs": o.subtotal_ghs,
             "delivery_fee_ghs": o.delivery_fee_ghs,
+            "service_fee_ghs": o.service_fee_ghs,
             "total_ghs": o.total_ghs,
         },
         "delivery_distance_km": o.delivery_distance_km,
@@ -137,6 +149,7 @@ def _order_summary(o):
     d = {
         "id": o.id,
         "status": o.status,
+        "driver_status": o.driver_status,
         "total_cents": o.total_cents,
         "delivery_address_id": o.delivery_address_id,
         "vendor_id": o.vendor_id,
@@ -172,10 +185,60 @@ def _offer_to_json(offer):
 
 # ---- Public driver auth (PIN) ----
 
+
+def _driver_auth_response(driver: Driver):
+    token = create_access_token(
+        identity=str(driver.id),
+        additional_claims={"type": "driver", "role": "driver", "driver_id": driver.id},
+    )
+    return ok({
+        "token": token,
+        "driver": {
+            "id": driver.id,
+            "name": driver.full_name or f"Driver {driver.id}",
+            "phone": driver.phone,
+            "is_available": bool(driver.is_online),
+        },
+    })
+
 @driver_bp.route("", methods=["GET"])
 def list_drivers():
     drivers = Driver.query.filter_by(driver_is_active=True, approved=True).all()
     return ok({"drivers": [_driver_public_json(d) for d in drivers]})
+
+
+@driver_bp.route("/auth/pin", methods=["POST"])
+def driver_auth_pin():
+    data = request.get_json() or {}
+    pin = data.get("pin")
+    if not pin:
+        return error("Missing pin", 400)
+    driver_id = data.get("driver_id")
+    phone = (data.get("phone") or "").strip()
+    driver = None
+    if driver_id is not None:
+        try:
+            driver_id = int(driver_id)
+        except (TypeError, ValueError):
+            return error("driver_id must be an integer", 400)
+        driver = Driver.query.get(driver_id)
+    elif phone:
+        driver = Driver.query.filter_by(phone=phone).first()
+    else:
+        return error("driver_id or phone required", 400)
+
+    if not driver or not driver.driver_is_active or not driver.approved:
+        return error("Driver not found", 404)
+    if not driver.driver_pin_hash:
+        return error("Driver PIN not set", 404)
+    if _is_rate_limited(_rate_limit_key(driver.id)):
+        return error("Too many attempts. Try again later.", 429)
+    if not check_password_hash(driver.driver_pin_hash, str(pin)):
+        _record_failure(_rate_limit_key(driver.id))
+        sleep(0.5)
+        return error("Invalid PIN", 401)
+
+    return _driver_auth_response(driver)
 
 
 @driver_bp.route("/<int:driver_id>/verify-pin", methods=["POST"])
@@ -187,7 +250,7 @@ def verify_pin(driver_id: int):
     if not pin:
         return error("Missing pin", 400)
     driver = Driver.query.get(driver_id)
-    if not driver or not driver.driver_is_active:
+    if not driver or not driver.driver_is_active or not driver.approved:
         return error("Driver not found", 404)
     if not driver.driver_pin_hash:
         return error("Driver PIN not set", 404)
@@ -196,12 +259,7 @@ def verify_pin(driver_id: int):
         sleep(0.5)
         return error("Invalid PIN", 401)
 
-    token = create_access_token(
-        identity=str(driver.id),
-        additional_claims={"type": "driver", "role": "driver", "driver_id": driver.id},
-        expires_delta=timedelta(hours=12),
-    )
-    return ok({"token": token, "driverId": driver.id, "driverName": driver.full_name or f"Driver {driver.id}"})
+    return _driver_auth_response(driver)
 
 
 # ---- /me/* (auth driver, own data only) ----
@@ -228,6 +286,26 @@ def me_set_location():
     return ok({"lat": driver.last_known_lat, "lng": driver.last_known_lng})
 
 
+@driver_bp.route("/me", methods=["GET"])
+@require_role("driver")
+def me_profile():
+    did = int(get_jwt_identity())
+    driver = Driver.query.get(did)
+    if not driver:
+        return error("Driver not found", 404)
+    return ok({
+        "id": driver.id,
+        "name": driver.full_name,
+        "phone": driver.phone,
+        "approved": driver.approved,
+        "is_active": driver.driver_is_active,
+        "is_available": bool(driver.is_online),
+        "last_known_lat": driver.last_known_lat,
+        "last_known_lng": driver.last_known_lng,
+        "last_location_at": driver.last_location_at.isoformat() if driver.last_location_at else None,
+    })
+
+
 @driver_bp.route("/me/online", methods=["POST"])
 @require_role("driver")
 def me_go_online():
@@ -242,6 +320,21 @@ def me_go_online():
         driver.is_online = True
     db.session.commit()
     return ok({"is_online": driver.is_online})
+
+
+@driver_bp.route("/me/availability", methods=["PATCH"])
+@require_role("driver")
+def me_set_availability():
+    did = int(get_jwt_identity())
+    driver = Driver.query.get(did)
+    if not driver:
+        return error("Driver not found", 404)
+    data = request.get_json() or {}
+    if "is_available" not in data:
+        return error("is_available is required", 400)
+    driver.is_online = bool(data.get("is_available"))
+    db.session.commit()
+    return ok({"is_available": bool(driver.is_online)})
 
 
 @driver_bp.route("/me/offline", methods=["POST"])
@@ -340,29 +433,34 @@ def update_location():
 @driver_bp.route("/orders/ready", methods=["GET"])
 @require_role("driver")
 def list_ready_orders():
-    orders = Order.query.filter_by(status=Order.STATUS_READY, driver_id=None).order_by(Order.created_at.desc()).all()
+    orders = Order.query.filter(
+        Order.status == Order.STATUS_READY,
+        Order.driver_id.is_(None),
+    ).order_by(Order.created_at.desc()).all()
     return ok({"orders": [_driver_order_json(o) for o in orders]})
 
 
 @driver_bp.route("/orders/<int:order_id>/accept", methods=["POST"])
-@require_role("driver")
+@jwt_required(optional=True)
 def accept_order(order_id: int):
-    did = _get_driver_id_from_jwt()
-    if not did:
-        return error("Invalid driver token", 403)
+    did, err = get_actor_id_or_401("driver_id", expected_role="driver")
+    if err:
+        return err
     driver = Driver.query.get(did)
     if not driver or not driver.driver_is_active:
         return error("Driver not found", 404)
+    if not driver.is_online:
+        return error("Driver not available", 409)
 
     if not _assign_order_atomic(order_id, did):
-        return error("Order already assigned", 409)
+        return error("Order already assigned, not ready, or offer expired", 409)
 
     order = Order.query.get(order_id)
-    if order:
-        _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} accepted order")
-        db.session.commit()
-        return ok(_driver_order_json(order))
-    return error("Order not found", 404)
+    if not order:
+        return error("Order not found", 404)
+    _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} accepted order")
+    db.session.commit()
+    return ok(_driver_order_json(order))
 
 
 # Backward compatibility
@@ -370,6 +468,45 @@ def accept_order(order_id: int):
 @require_role("driver")
 def claim_order(order_id: int):
     return accept_order(order_id)
+
+
+@driver_bp.route("/orders/<int:order_id>/location", methods=["POST", "PATCH"])
+@jwt_required(optional=True)
+def update_order_location(order_id: int):
+    did, err = get_actor_id_or_401("driver_id", expected_role="driver")
+    if err:
+        return err
+    order = Order.query.get(order_id)
+    if not order:
+        return error("Order not found", 404)
+    if order.driver_id != did:
+        return error("Forbidden", 403)
+
+    data = request.get_json() or {}
+    lat = data.get("lat", data.get("driver_lat"))
+    lng = data.get("lng", data.get("driver_lng"))
+    if lat is None or lng is None:
+        return error("lat and lng required", 400)
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError):
+        return error("lat and lng must be numbers", 400)
+
+    order.driver_lat = lat
+    order.driver_lng = lng
+    order.driver_location_updated_at = datetime.utcnow()
+    if order.driver:
+        order.driver.last_known_lat = lat
+        order.driver.last_known_lng = lng
+        order.driver.last_location_at = order.driver_location_updated_at
+    db.session.commit()
+    return ok({
+        "order_id": order.id,
+        "driver_lat": order.driver_lat,
+        "driver_lng": order.driver_lng,
+        "driver_location_updated_at": order.driver_location_updated_at.isoformat(),
+    })
 
 
 @driver_bp.route("/orders/active", methods=["GET"])
@@ -401,14 +538,16 @@ def list_completed_orders():
 
 
 @driver_bp.route("/orders/<int:order_id>/status", methods=["POST", "PATCH"])
-@require_role("driver")
+@jwt_required(optional=True)
 def update_order_status_driver(order_id: int):
-    did = _get_driver_id_from_jwt()
-    if not did:
-        return error("Invalid driver token", 403)
-    order = Order.query.filter_by(id=order_id, driver_id=did).first()
+    did, err = get_actor_id_or_401("driver_id", expected_role="driver")
+    if err:
+        return err
+    order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
+    if order.driver_id != did:
+        return error("Forbidden", 403)
     data = request.get_json() or {}
     requested = (data.get("next_status") or data.get("status") or "").strip()
     if not requested:
@@ -421,39 +560,54 @@ def update_order_status_driver(order_id: int):
         return error("next_status must be picked_up or delivered", 400)
 
     try:
-        set_order_status(order, next_status, actor="driver")
-    except OrderStatusError as e:
-        return error(str(e), 409)
+        order.set_status(next_status, role="driver")
+    except ValueError as e:
+        return error(str(e), 400)
     _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} -> {next_status}")
     db.session.commit()
+    if order.status == Order.STATUS_DELIVERED:
+        from ..services.ledger import maybe_create_vendor_credit
+        maybe_create_vendor_credit(order)
     return ok(_driver_order_json(order))
 
 
 @driver_bp.route("/orders/<int:order_id>/picked-up", methods=["POST"])
-@require_role("driver")
+@jwt_required(optional=True)
 def mark_picked_up(order_id):
-    did = int(get_jwt_identity())
-    order = Order.query.filter_by(id=order_id, driver_id=did).first()
+    did, err = get_actor_id_or_401("driver_id", expected_role="driver")
+    if err:
+        return err
+    order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
+    if order.driver_id != did:
+        return error("Forbidden", 403)
     try:
-        set_order_status(order, Order.STATUS_PICKED_UP, actor="driver")
-    except OrderStatusError as e:
+        order.set_status(Order.STATUS_PICKED_UP, role="driver")
+    except ValueError as e:
         return error(str(e), 400)
+    db.session.commit()
     return ok(_order_summary(order))
 
 
 @driver_bp.route("/orders/<int:order_id>/delivered", methods=["POST"])
-@require_role("driver")
+@jwt_required(optional=True)
 def mark_delivered(order_id):
-    did = int(get_jwt_identity())
-    order = Order.query.filter_by(id=order_id, driver_id=did).first()
+    did, err = get_actor_id_or_401("driver_id", expected_role="driver")
+    if err:
+        return err
+    order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
+    if order.driver_id != did:
+        return error("Forbidden", 403)
     try:
-        set_order_status(order, Order.STATUS_DELIVERED, actor="driver")
-    except OrderStatusError as e:
+        order.set_status(Order.STATUS_DELIVERED, role="driver")
+    except ValueError as e:
         return error(str(e), 400)
+    db.session.commit()
+    from ..services.ledger import maybe_create_vendor_credit
+    maybe_create_vendor_credit(order)
     return ok(_order_summary(order))
 
 
@@ -461,8 +615,71 @@ def mark_delivered(order_id):
 @require_role("driver")
 def list_my_orders():
     did = int(get_jwt_identity())
-    orders = Order.query.filter_by(driver_id=did).order_by(Order.created_at.desc()).limit(50).all()
+    orders = (
+        Order.query.filter(
+            Order.driver_id == did,
+            Order.status.in_([Order.STATUS_ASSIGNED, Order.STATUS_PICKED_UP]),
+        )
+        .order_by(Order.created_at.desc())
+        .limit(50)
+        .all()
+    )
     return ok({"orders": [_order_summary(o) for o in orders]})
+
+
+@driver_bp.route("/orders/<int:order_id>", methods=["PATCH"])
+@jwt_required(optional=True)
+def update_driver_order(order_id: int):
+    did, err = get_actor_id_or_401("driver_id", expected_role="driver")
+    if err:
+        return err
+    order = Order.query.get(order_id)
+    if not order:
+        return error("Order not found", 404)
+    if order.driver_id != did:
+        return error("Forbidden", 403)
+
+    data = request.get_json() or {}
+    requested = (data.get("action") or data.get("next_status") or data.get("status") or "").strip().lower()
+    if not requested:
+        return error("Missing action", 400)
+
+    if requested in ("accept", "accepted"):
+        if order.status != Order.STATUS_ASSIGNED:
+            return error("Order not assigned", 409)
+        order.driver_status = Order.DRIVER_STATUS_ACCEPTED
+        _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} accepted job")
+        db.session.commit()
+        return ok(_driver_order_json(order))
+
+    if requested in ("picked_up", "pickup", "pickedup"):
+        if order.status not in (Order.STATUS_ASSIGNED, Order.STATUS_PICKED_UP):
+            return error("Order not ready for pickup", 409)
+        if order.status != Order.STATUS_PICKED_UP:
+            try:
+                order.set_status(Order.STATUS_PICKED_UP, role="driver")
+            except ValueError as e:
+                return error(str(e), 400)
+        order.driver_status = Order.DRIVER_STATUS_PICKED_UP
+        _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} picked up")
+        db.session.commit()
+        return ok(_driver_order_json(order))
+
+    if requested in ("delivered", "dropoff", "drop_off"):
+        if order.status != Order.STATUS_PICKED_UP:
+            return error("Order not picked up", 409)
+        try:
+            order.set_status(Order.STATUS_DELIVERED, role="driver")
+        except ValueError as e:
+            return error(str(e), 400)
+        order.driver_status = Order.DRIVER_STATUS_DELIVERED
+        _append_note(order, f"[{datetime.utcnow().isoformat()}Z] driver {did} delivered")
+        db.session.commit()
+        from ..services.ledger import maybe_create_vendor_credit
+        maybe_create_vendor_credit(order)
+        return ok(_driver_order_json(order))
+
+    return error("Invalid action", 400)
 
 
 @driver_bp.route("/offers", methods=["GET"])

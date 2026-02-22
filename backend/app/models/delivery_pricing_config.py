@@ -10,6 +10,8 @@ class DeliveryPricingConfig(db.Model):
     base_km = db.Column(db.Float, nullable=False, default=3.0)
     base_fee_ghs = db.Column(db.Numeric(10, 2), nullable=False, default=12)
     per_km_fee_ghs = db.Column(db.Numeric(10, 2), nullable=False, default=2)
+    service_fee_percent = db.Column(db.Numeric(5, 2), nullable=False, default=0)
+    minimum_service_fee_ghs = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
@@ -17,5 +19,7 @@ class DeliveryPricingConfig(db.Model):
             "base_km": float(self.base_km),
             "base_fee_ghs": float(self.base_fee_ghs),
             "per_km_fee_ghs": float(self.per_km_fee_ghs),
+            "service_fee_percent": float(self.service_fee_percent),
+            "minimum_service_fee_ghs": float(self.minimum_service_fee_ghs),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

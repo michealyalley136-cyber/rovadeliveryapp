@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { apiGet } from '../api/client';
 import { useToast } from '../components/ToastProvider';
+import { computeFeeBreakdown } from '../utils/fees';
 
 const CART_KEY_PREFIX = 'customerCart:';
 const ACTIVE_VENDOR_KEY = 'customerActiveVendorId';
@@ -32,17 +33,20 @@ const Menu = () => {
   const [menu, setMenu] = useState([]);
   const [cart, setCartState] = useState(() => getCart(vendorId));
   const [loading, setLoading] = useState(true);
+  const [pricingConfig, setPricingConfig] = useState(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [vendorData, menuData] = await Promise.all([
+      const [vendorData, menuData, pricingData] = await Promise.all([
         apiGet('/public/vendors'),
         apiGet(`/public/vendors/${vendorId}/menu`),
+        apiGet('/pricing'),
       ]);
       const match = (vendorData.vendors || []).find((v) => String(v.id) === String(vendorId));
       setVendor(match || { id: vendorId, name: `Vendor #${vendorId}` });
       setMenu(menuData.items || []);
+      setPricingConfig(pricingData.config || null);
     } catch (e) {
       toast({ type: 'error', message: e.message, persist: true });
     } finally {
@@ -94,6 +98,11 @@ const Menu = () => {
     const subtotal = cart.reduce((sum, i) => sum + i.qty * i.unit_price, 0);
     return { subtotal };
   }, [cart]);
+
+  const fees = useMemo(
+    () => computeFeeBreakdown({ subtotal: totals.subtotal, config: pricingConfig, vendor }),
+    [totals.subtotal, pricingConfig, vendor]
+  );
 
   const goToCheckout = () => {
     if (cart.length === 0) {
@@ -199,6 +208,18 @@ const Menu = () => {
             <div className="flex items-center justify-between">
               <span>Items subtotal</span>
               <span>GHS {totals.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span>Delivery fee</span>
+              <span>GHS {fees.deliveryFee.toFixed(2)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span>Service fee</span>
+              <span>GHS {fees.serviceFee.toFixed(2)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-white">
+              <span>Total</span>
+              <span>GHS {fees.total.toFixed(2)}</span>
             </div>
           </div>
           <button onClick={goToCheckout} className="btn-primary w-full rounded-lg px-4 py-2 text-sm">

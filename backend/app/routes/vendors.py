@@ -1,5 +1,4 @@
 """List vendors (approved only for customers)."""
-from datetime import timedelta
 from time import sleep, time
 
 from flask import Blueprint, request
@@ -20,6 +19,19 @@ def _vendor_to_json(v):
     return {
         "id": v.id,
         "name": v.name,
+        "description": v.description,
+        "phone": v.phone,
+        "hours": v.hours,
+        "delivery_radius_km": v.delivery_radius_km,
+        "minimum_order_amount": v.minimum_order_amount,
+        "prep_time_minutes": v.prep_time_minutes,
+        "base_delivery_fee_ghs": v.base_delivery_fee_ghs,
+        "per_km_fee_ghs": v.per_km_fee_ghs,
+        "service_fee_percent": v.service_fee_percent,
+        "minimum_service_fee_ghs": v.minimum_service_fee_ghs,
+        "logo_url": v.logo_url,
+        "banner_url": v.banner_url,
+        "is_active": v.vendor_is_active,
         "vendor_type": v.vendor_type,
         "whatsapp_number": v.whatsapp_number,
     }
@@ -82,6 +94,5 @@ def verify_pin(vendor_id: int):
     token = create_access_token(
         identity=str(vendor.id),
         additional_claims={"role": "vendor", "vendor_id": vendor.id},
-        expires_delta=timedelta(hours=12),
     )
     return ok({"token": token, "vendorId": vendor.id, "vendorName": vendor.name})

@@ -1,15 +1,21 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
-const API_ROOT = `${API_BASE_URL}/api`;
+const API_ROOT = '/api';
 
 const TOKEN_KEY = 'vendorToken';
 const VENDOR_ID_KEY = 'vendorId';
+const VENDOR_NAME_KEY = 'vendorName';
 const SELECTED_VENDOR_KEY = 'selectedVendorId';
+const SELECTED_VENDOR_NAME_KEY = 'selectedVendorName';
 const VENDOR_LIST_CACHE_KEY = 'vendorListCache';
+const AUTH_MESSAGE_KEY = 'rova_vendor_auth_message';
+const AUTH_REDIRECT = '/vendor/select';
 
 let apiHandlers = {
   onNetworkError: null,
   onClear: null,
+  onAuthError: null,
 };
+let authHandling = false;
+let lastAuthHandledAt = 0;
 
 export const setApiHandlers = (handlers = {}) => {
   apiHandlers = { ...apiHandlers, ...handlers };
@@ -17,21 +23,30 @@ export const setApiHandlers = (handlers = {}) => {
 
 export const getVendorToken = () => localStorage.getItem(TOKEN_KEY) || '';
 export const getVendorId = () => localStorage.getItem(VENDOR_ID_KEY) || '';
+export const getVendorName = () => localStorage.getItem(VENDOR_NAME_KEY) || '';
 export const getSelectedVendorId = () => localStorage.getItem(SELECTED_VENDOR_KEY) || '';
+export const getSelectedVendorName = () => localStorage.getItem(SELECTED_VENDOR_NAME_KEY) || '';
 
-export const setVendorSession = (token, vendorId) => {
+export const setVendorSession = (token, vendorId, vendorName) => {
   if (!token) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(VENDOR_ID_KEY);
+    localStorage.removeItem(VENDOR_NAME_KEY);
     return;
   }
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(VENDOR_ID_KEY, String(vendorId || ''));
+  if (vendorName) {
+    localStorage.setItem(VENDOR_NAME_KEY, String(vendorName));
+  }
+  localStorage.removeItem(SELECTED_VENDOR_KEY);
+  localStorage.removeItem(SELECTED_VENDOR_NAME_KEY);
 };
 
 export const clearVendorSession = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(VENDOR_ID_KEY);
+  localStorage.removeItem(VENDOR_NAME_KEY);
 };
 
 export const setSelectedVendorId = (vendorId) => {
@@ -46,9 +61,36 @@ export const clearSelectedVendorId = () => {
   localStorage.removeItem(SELECTED_VENDOR_KEY);
 };
 
+export const setSelectedVendor = (vendorId, vendorName) => {
+  if (!vendorId) {
+    clearSelectedVendorId();
+    localStorage.removeItem(SELECTED_VENDOR_NAME_KEY);
+    return;
+  }
+  localStorage.setItem(SELECTED_VENDOR_KEY, String(vendorId));
+  if (vendorName) {
+    localStorage.setItem(SELECTED_VENDOR_NAME_KEY, String(vendorName));
+  }
+};
+
+export const clearSelectedVendor = () => {
+  localStorage.removeItem(SELECTED_VENDOR_KEY);
+  localStorage.removeItem(SELECTED_VENDOR_NAME_KEY);
+};
+
 export const clearVendorState = () => {
   clearVendorSession();
-  clearSelectedVendorId();
+  clearSelectedVendor();
+};
+
+const setAuthMessage = (message) => {
+  if (message) sessionStorage.setItem(AUTH_MESSAGE_KEY, message);
+};
+
+export const consumeAuthMessage = () => {
+  const message = sessionStorage.getItem(AUTH_MESSAGE_KEY) || '';
+  if (message) sessionStorage.removeItem(AUTH_MESSAGE_KEY);
+  return message;
 };
 
 export const setVendorListCache = (vendors = []) => {
@@ -81,38 +123,80 @@ const buildHeaders = (auth = true) => {
   return headers;
 };
 
-const request = async (path, { method = 'GET', body, auth = true } = {}) => {
+const normalizePath = (path) => (path.startsWith('/') ? path : `/${path}`);
+
+const parsePayload = (text) => {
+  if (!text) return { data: null, text: '' };
+  try {
+    return { data: JSON.parse(text), text };
+  } catch {
+    return { data: null, text };
+  }
+};
+
+const buildErrorMessage = (method, url, status, payload, fallbackText, statusText) => {
+  let detail = '';
+  if (payload && typeof payload === 'object') {
+    detail = payload.error || payload.message || payload.details || payload.msg || '';
+    if (!detail && Object.keys(payload).length) {
+      detail = JSON.stringify(payload);
+    }
+  }
+  if (!detail && fallbackText) detail = fallbackText;
+  if (!detail) detail = statusText || 'Request failed';
+  return `${method} ${url} -> ${status} ${detail}`;
+};
+
+const handleAuthFailure = (status) => {
+  const now = Date.now();
+  if (authHandling && now - lastAuthHandledAt < 3000) return;
+  authHandling = true;
+  lastAuthHandledAt = now;
+  clearVendorState();
+  const message =
+    status === 403
+      ? 'Access denied. Please sign in again.'
+      : 'Session expired. Please sign in again.';
+  setAuthMessage(message);
+  if (apiHandlers.onAuthError) apiHandlers.onAuthError(message);
+  if (!window.location.pathname.startsWith(AUTH_REDIRECT)) {
+    window.location.assign(AUTH_REDIRECT);
+  }
+};
+
+export const apiRequest = async (method, path, body, { auth = true } = {}) => {
+  const url = `${API_ROOT}${normalizePath(path)}`;
   let res;
   try {
-    res = await fetch(`${API_ROOT}${path}`, {
+    res = await fetch(url, {
       method,
       headers: buildHeaders(auth),
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch (err) {
-    const message = 'Network error: Cannot reach server. Check backend is running on :5000.';
+    const message = `${method} ${url} -> 0 ${err?.message || 'Network error'}`;
     if (apiHandlers.onNetworkError) apiHandlers.onNetworkError(message);
     throw new Error(message);
   }
-  if (apiHandlers.onClear) apiHandlers.onClear();
-  let data = {};
-  try {
-    data = await res.json();
-  } catch {
-    data = {};
-  }
+  const text = await res.text();
+  const { data, text: fallbackText } = parsePayload(text);
   if (!res.ok) {
     if (auth && (res.status === 401 || res.status === 403)) {
-      clearVendorState();
+      handleAuthFailure(res.status);
+      const err = new Error('');
+      err.authFailure = true;
+      throw err;
     }
-    const message = data.error || data.msg || 'Request failed';
-    throw new Error(message);
+    throw new Error(
+      buildErrorMessage(method, url, res.status, data, fallbackText, res.statusText)
+    );
   }
-  return data;
+  if (apiHandlers.onClear) apiHandlers.onClear();
+  return data ?? (fallbackText ? fallbackText : {});
 };
 
-export const apiGet = (path, opts = {}) => request(path, { ...opts, method: 'GET' });
-export const apiPost = (path, body, opts = {}) => request(path, { ...opts, method: 'POST', body });
-export const apiPatch = (path, body, opts = {}) => request(path, { ...opts, method: 'PATCH', body });
+export const apiGet = (path, opts = {}) => apiRequest('GET', path, undefined, opts);
+export const apiPost = (path, body, opts = {}) => apiRequest('POST', path, body, opts);
+export const apiPatch = (path, body, opts = {}) => apiRequest('PATCH', path, body, opts);
 
-export const publicGet = (path) => request(path, { auth: false, method: 'GET' });
+export const publicGet = (path) => apiRequest('GET', path, undefined, { auth: false });

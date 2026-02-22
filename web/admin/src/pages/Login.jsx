@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { getAdminKey, setAdminKey } from '../api/client';
+import { getAdminKey, setAdminKey, consumeAuthMessage } from '../api/client';
 import { useToast } from '../components/ToastProvider';
 
 const Login = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const [key, setKey] = useState(getAdminKey());
+
+  React.useEffect(() => {
+    const message = consumeAuthMessage();
+    if (message) {
+      toast({ type: 'error', message });
+    }
+  }, [toast]);
 
   const submit = (e) => {
     e.preventDefault();

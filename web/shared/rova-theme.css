@@ -1,0 +1,122 @@
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  min-height: 100vh;
+}
+
+.rova-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+}
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.btn-primary:hover { background: var(--color-primary-hover); }
+
+.btn-secondary {
+  background: var(--color-secondary);
+  color: var(--color-primary-foreground);
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.btn-secondary:hover { background: var(--color-secondary-hover); }
+
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+  border-color: var(--focus-border);
+}
+
+.accent-dot { background: var(--color-accent); }
+.accent-pill {
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--color-accent);
+}
+
+.alert-error {
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--color-text);
+}
+.alert-error-title { color: var(--color-danger); }
+.alert-error-btn {
+  border: 1px solid var(--danger-border);
+  color: var(--color-danger);
+  background: transparent;
+}
+.alert-error-btn:hover { border-color: var(--color-danger); }
+
+.toast {
+  border: 1px solid var(--color-border);
+  color: inherit;
+}
+.toast-error {
+  border-color: var(--danger-border);
+  color: var(--color-danger);
+}
+.toast-success {
+  border-color: var(--success-border);
+  color: var(--color-success);
+}
+.toast-info { color: inherit; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+.badge-ready { background: var(--status-ready-bg); color: var(--status-ready-fg); border-color: var(--status-ready-bd); }
+.badge-active { background: var(--status-assigned-bg); color: var(--status-assigned-fg); border-color: var(--status-assigned-bd); }
+.badge-warning { background: var(--status-accepted-bg); color: var(--status-accepted-fg); border-color: var(--status-accepted-bd); }
+.badge-completed { background: var(--status-completed-bg); color: var(--status-completed-fg); border-color: var(--status-completed-bd); }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+.status-new { background: var(--status-new-bg); color: var(--status-new-fg); border-color: var(--status-new-bd); }
+.status-placed { background: var(--status-placed-bg); color: var(--status-placed-fg); border-color: var(--status-placed-bd); }
+.status-accepted { background: var(--status-accepted-bg); color: var(--status-accepted-fg); border-color: var(--status-accepted-bd); }
+.status-preparing { background: var(--status-preparing-bg); color: var(--status-preparing-fg); border-color: var(--status-preparing-bd); }
+.status-ready { background: var(--status-ready-bg); color: var(--status-ready-fg); border-color: var(--status-ready-bd); }
+.status-assigned { background: var(--status-assigned-bg); color: var(--status-assigned-fg); border-color: var(--status-assigned-bd); }
+.status-picked_up { background: var(--status-picked_up-bg); color: var(--status-picked_up-fg); border-color: var(--status-picked_up-bd); }
+.status-completed { background: var(--status-completed-bg); color: var(--status-completed-fg); border-color: var(--status-completed-bd); }
+.status-delivered { background: var(--status-delivered-bg); color: var(--status-delivered-fg); border-color: var(--status-delivered-bd); }
+.status-cancelled { background: var(--status-cancelled-bg); color: var(--status-cancelled-fg); border-color: var(--status-cancelled-bd); }
+.status-declined { background: var(--status-declined-bg); color: var(--status-declined-fg); border-color: var(--status-declined-bd); }
+.status-unknown { background: var(--status-unknown-bg); color: var(--status-unknown-fg); border-color: var(--status-unknown-bd); }
+
+.order-card-new {
+  border-color: var(--accent-border);
+  box-shadow: var(--accent-shadow);
+}

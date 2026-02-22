@@ -1,12 +1,12 @@
 """Vendor login + order queue (MVP)."""
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from flask import Blueprint, request
 from flask_jwt_extended import create_access_token, get_jwt, get_jwt_identity, jwt_required
 from werkzeug.security import check_password_hash
 
 from ..extensions import db
-from ..models import Vendor, Order
+from ..models import Vendor, Order, Driver
 from ..services.order_state import set_order_status, OrderStatusError, normalize_status
 from ..utils.auth import check_password
 from ..utils.responses import ok, error
@@ -32,11 +32,15 @@ def _order_to_json(o: Order) -> dict:
         "id": o.id,
         "vendor_id": o.vendor_id,
         "status": o.status,
+        "payment_method": o.payment_method,
+        "payment_status": o.payment_status,
         "subtotal_cents": o.subtotal_cents,
         "delivery_fee_cents": o.delivery_fee_cents,
+        "service_fee_cents": o.service_fee_cents,
         "total_cents": o.total_cents,
         "delivery_distance_km": o.delivery_distance_km,
         "delivery_fee_ghs": o.delivery_fee_ghs,
+        "service_fee_ghs": o.service_fee_ghs,
         "subtotal_ghs": o.subtotal_ghs,
         "total_ghs": o.total_ghs,
         "created_at": o.created_at.isoformat() if o.created_at else None,
@@ -47,6 +51,9 @@ def _order_to_json(o: Order) -> dict:
                 "name": i.menu_item.name,
                 "quantity": i.quantity,
                 "unit_price_cents": i.unit_price_cents,
+                "notes": i.notes,
+                "allow_substitution": i.allow_substitution,
+                "substitution_note": i.substitution_note,
             }
             for i in o.items
         ],
@@ -75,33 +82,53 @@ def _get_vendor_id_from_jwt():
         return None
 
 
-@vendor_bp.route("/login", methods=["POST"])
-def login():
-    data = request.get_json() or {}
+def _authenticate_vendor_pin(data):
     missing = validate_required(data, ["vendor_id", "pin"])
     if missing:
-        return error(f"Missing: {', '.join(missing)}", 400)
+        return None, error(f"Missing: {', '.join(missing)}", 400)
     vendor_id = data.get("vendor_id")
     pin = data.get("pin")
     try:
         vendor_id = int(vendor_id)
     except (TypeError, ValueError):
-        return error("vendor_id must be an integer", 400)
+        return None, error("vendor_id must be an integer", 400)
 
     vendor = Vendor.query.get(vendor_id)
     if not vendor or not vendor.vendor_is_active or (not vendor.vendor_pin_hash and not vendor.pin_hash):
-        return error("Vendor not found or PIN not set", 404)
+        return None, error("Vendor not found or PIN not set", 404)
     if vendor.vendor_pin_hash:
         valid = check_password_hash(vendor.vendor_pin_hash, str(pin))
     else:
         valid = check_password(str(pin), vendor.pin_hash)
     if not valid:
-        return error("Invalid PIN", 401)
+        return None, error("Invalid PIN", 401)
+    return vendor, None
+
+
+@vendor_bp.route("/auth/pin", methods=["POST"])
+def auth_pin():
+    data = request.get_json() or {}
+    vendor, err = _authenticate_vendor_pin(data)
+    if err:
+        return err
 
     token = create_access_token(
         identity=str(vendor.id),
         additional_claims={"type": "vendor", "role": "vendor", "vendor_id": vendor.id},
-        expires_delta=timedelta(hours=12),
+    )
+    return ok({"token": token, "vendor": {"id": vendor.id, "name": vendor.name}})
+
+
+@vendor_bp.route("/login", methods=["POST"])
+def login():
+    data = request.get_json() or {}
+    vendor, err = _authenticate_vendor_pin(data)
+    if err:
+        return err
+
+    token = create_access_token(
+        identity=str(vendor.id),
+        additional_claims={"type": "vendor", "role": "vendor", "vendor_id": vendor.id},
     )
     return ok({"vendor": _vendor_to_json(vendor), "access_token": token})
 
@@ -148,12 +175,10 @@ def accept_order(order_id: int):
     order = Order.query.filter_by(id=order_id, vendor_id=vendor_id).first()
     if not order:
         return error("Order not found", 404)
-    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED):
-        return error("Order cannot be accepted in current state", 400)
     try:
-        set_order_status(order, Order.STATUS_PREPARING, actor="vendor")
+        set_order_status(order, Order.STATUS_ACCEPTED, actor="vendor")
     except OrderStatusError as e:
-        return error(str(e), 400)
+        return error(str(e), 409)
     return ok(_order_to_json(order))
 
 
@@ -169,12 +194,10 @@ def ready_order(order_id: int):
     order = Order.query.filter_by(id=order_id, vendor_id=vendor_id).first()
     if not order:
         return error("Order not found", 404)
-    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED):
-        return error("Order cannot be set Ready in current state", 400)
     try:
         set_order_status(order, Order.STATUS_READY, actor="vendor")
     except OrderStatusError as e:
-        return error(str(e), 400)
+        return error(str(e), 409)
     return ok(_order_to_json(order))
 
 
@@ -191,17 +214,20 @@ def _log_status_change(order: Order, vendor_id: int, old_status: str, new_status
 @vendor_bp.route("/orders/<int:order_id>/status", methods=["POST", "PATCH"])
 @jwt_required()
 def update_order_status(order_id: int):
+    data = request.get_json() or {}
     auth_error = _require_vendor_claims()
     if auth_error:
         return auth_error
     vendor_id = _get_vendor_id_from_jwt()
     if not vendor_id:
         return error("Invalid vendor token", 403)
-    order = Order.query.filter_by(id=order_id, vendor_id=vendor_id).first()
+
+    order = Order.query.get(order_id)
     if not order:
         return error("Order not found", 404)
+    if order.vendor_id != vendor_id:
+        return error("Forbidden", 403)
 
-    data = request.get_json() or {}
     requested = (data.get("next_status") or data.get("status") or "").strip()
     if not requested:
         return error("Missing next_status", 400)
@@ -210,25 +236,81 @@ def update_order_status(order_id: int):
     except OrderStatusError as e:
         return error(str(e), 400)
 
-    if next_status == Order.STATUS_DELIVERED:
-        return error("Vendors cannot mark delivered", 403)
-
-    if next_status == Order.STATUS_READY and order.status == Order.STATUS_NEW:
-        return error("Order must be preparing before ready", 409)
-
-    if next_status == Order.STATUS_ASSIGNED:
-        return error("Vendors cannot assign drivers", 403)
-
-    if next_status == Order.STATUS_CANCELLED:
-        return error("Vendors cannot cancel orders", 403)
-
     old_status = order.status
     try:
-        set_order_status(order, next_status, actor="vendor")
-    except OrderStatusError as e:
-        return error(str(e), 409)
+        order.set_status(next_status, role="vendor")
+    except ValueError as e:
+        message = str(e)
+        code = 409 if message == "Awaiting payment" else 400
+        return error(message, code)
+    db.session.commit()
+
+    if order.status == Order.STATUS_READY:
+        from ..services.dispatch import dispatch_order
+        dispatch_order(order.id)
+        db.session.refresh(order)
 
     if old_status != order.status:
         _log_status_change(order, vendor_id, old_status, order.status)
 
+    if order.status == Order.STATUS_DELIVERED:
+        from ..services.ledger import maybe_create_vendor_credit
+        maybe_create_vendor_credit(order)
+
+    return ok(_order_to_json(order))
+
+
+@vendor_bp.route("/orders/<int:order_id>", methods=["PATCH"])
+@jwt_required()
+def patch_order(order_id: int):
+    return update_order_status(order_id)
+
+
+@vendor_bp.route("/orders/<int:order_id>/assign-driver", methods=["PATCH"])
+@jwt_required()
+def assign_driver(order_id: int):
+    auth_error = _require_vendor_claims()
+    if auth_error:
+        return auth_error
+    vendor_id = _get_vendor_id_from_jwt()
+    if not vendor_id:
+        return error("Invalid vendor token", 403)
+
+    data = request.get_json() or {}
+    driver_id = data.get("driver_id")
+    try:
+        driver_id = int(driver_id)
+    except (TypeError, ValueError):
+        return error("driver_id must be an integer", 400)
+
+    driver = Driver.query.get(driver_id)
+    if not driver:
+        return error("Driver not found", 404)
+    if not driver.approved or not driver.driver_is_active:
+        return error("Driver is not active", 409)
+
+    order = Order.query.get(order_id)
+    if not order:
+        return error("Order not found", 404)
+    if order.vendor_id != vendor_id:
+        return error("Forbidden", 403)
+    method = (order.payment_method or "").lower()
+    status = (order.payment_status or "").lower()
+    if method in (Order.PAYMENT_METHOD_MOMO, Order.PAYMENT_METHOD_CARD) and status != Order.PAYMENT_STATUS_PAID:
+        return error("Awaiting payment", 409)
+    if order.status in (Order.STATUS_CANCELLED, Order.STATUS_DELIVERED, Order.STATUS_DECLINED):
+        return error("Order is in a terminal state", 409)
+    if order.status not in (Order.STATUS_READY, Order.STATUS_ASSIGNED):
+        return error("Order must be ready to assign a driver", 409)
+    if order.driver_id and order.driver_id != driver_id:
+        return error("Order already assigned", 409)
+
+    order.driver_id = driver_id
+    if order.status != Order.STATUS_ASSIGNED:
+        order.status = Order.STATUS_ASSIGNED
+        if not order.assigned_at:
+            order.assigned_at = datetime.utcnow()
+    order.driver_status = Order.DRIVER_STATUS_ASSIGNED
+    order.offer_expires_at = None
+    db.session.commit()
     return ok(_order_to_json(order))

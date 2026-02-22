@@ -9,6 +9,9 @@ export const ToastProvider = ({ children }) => {
 
   const pushToast = useMemo(
     () => (toast) => {
+      if (!toast?.message) {
+        return;
+      }
       const id = Date.now() + Math.random();
       const payload = {
         id,

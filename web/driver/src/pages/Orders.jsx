@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { apiGet, apiPatch, apiPost } from '../api/client';
+import { apiGet, apiPatch } from '../api/client';
 import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/ToastProvider';
 
@@ -40,27 +40,14 @@ const formatClock = (date) => {
   return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 };
 
-const canonicalStatus = (status) => {
-  const map = {
-    Created: 'NEW',
-    SentToVendor: 'NEW',
-    Accepted: 'PREPARING',
-    Preparing: 'PREPARING',
-    Ready: 'READY',
-    Assigned: 'ASSIGNED',
-    PickedUp: 'ASSIGNED',
-    Delivered: 'COMPLETED',
-  };
-  return map[status] || status || 'UNKNOWN';
-};
-
 const Orders = () => {
   const { toast } = useToast();
-  const [readyOrders, setReadyOrders] = useState([]);
   const [activeOrders, setActiveOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [availability, setAvailability] = useState(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     return sessionStorage.getItem('driverOrdersActiveTab') || 'READY';
   });
@@ -77,12 +64,12 @@ const Orders = () => {
     inFlightRef.current = true;
     setLoading(true);
     try {
-      const [ready, active] = await Promise.all([
-        apiGet('/driver/orders/ready'),
-        apiGet('/driver/orders/active'),
+      const [active, completed] = await Promise.all([
+        apiGet('/driver/orders'),
+        apiGet('/driver/orders/completed'),
       ]);
-      setReadyOrders(ready.orders || []);
       setActiveOrders(active.orders || []);
+      setCompletedOrders(completed.orders || []);
       setLastUpdated(new Date());
     } catch (e) {
       toast({ type: 'error', message: e.message, persist: true });
@@ -95,6 +82,18 @@ const Orders = () => {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    const loadAvailability = async () => {
+      try {
+        const data = await apiGet('/driver/me');
+        setAvailability(Boolean(data.is_available));
+      } catch (e) {
+        toast({ type: 'error', message: e.message, persist: true });
+      }
+    };
+    loadAvailability();
+  }, [toast]);
 
   useEffect(() => {
     sessionStorage.setItem('driverOrdersActiveTab', activeTab);
@@ -150,49 +149,39 @@ const Orders = () => {
 
   const counts = useMemo(() => {
     return {
-      READY: readyOrders.length,
       ACTIVE: activeOrders.length,
       COMPLETED: completedOrders.length,
-      ALL: readyOrders.length + activeOrders.length + completedOrders.length,
+      ALL: activeOrders.length + completedOrders.length,
     };
-  }, [readyOrders, activeOrders, completedOrders]);
+  }, [activeOrders, completedOrders]);
 
   const visibleOrders = useMemo(() => {
-    if (activeTab === 'READY') return readyOrders;
     if (activeTab === 'ACTIVE') return activeOrders;
     if (activeTab === 'COMPLETED') return completedOrders;
-    return [...readyOrders, ...activeOrders, ...completedOrders];
-  }, [activeTab, readyOrders, activeOrders, completedOrders]);
+    return [...activeOrders, ...completedOrders];
+  }, [activeTab, activeOrders, completedOrders]);
 
-  const claimOrder = async (order) => {
+  const updateOrderStatus = async (order, action) => {
     const orderId = order.id;
-    setActionLoading((prev) => ({ ...prev, [orderId]: 'CLAIM' }));
+    setActionLoading((prev) => ({ ...prev, [orderId]: action }));
     try {
-      const data = await apiPost(`/driver/orders/${orderId}/claim`, {});
-      setReadyOrders((prev) => prev.filter((o) => o.id !== orderId));
-      setActiveOrders((prev) => [data, ...prev.filter((o) => o.id !== orderId)]);
+      const data = await apiPatch(`/driver/orders/${orderId}`, { action });
+      if (action === 'delivered') {
+        setActiveOrders((prev) => prev.filter((o) => o.id !== orderId));
+        setCompletedOrders((prev) => [data, ...prev.filter((o) => o.id !== orderId)]);
+      } else {
+        setActiveOrders((prev) => prev.map((o) => (o.id === orderId ? data : o)));
+      }
       setLastUpdated(new Date());
-      toast({ type: 'success', message: `Order #${orderId} claimed` });
-    } catch (e) {
-      toast({ type: 'error', message: e.message, persist: true });
-    } finally {
-      setActionLoading((prev) => {
-        const next = { ...prev };
-        delete next[orderId];
-        return next;
-      });
-    }
-  };
-
-  const completeOrder = async (order) => {
-    const orderId = order.id;
-    setActionLoading((prev) => ({ ...prev, [orderId]: 'COMPLETE' }));
-    try {
-      const data = await apiPatch(`/driver/orders/${orderId}/status`, { status: 'COMPLETED' });
-      setActiveOrders((prev) => prev.filter((o) => o.id !== orderId));
-      setCompletedOrders((prev) => [data, ...prev.filter((o) => o.id !== orderId)]);
-      setLastUpdated(new Date());
-      toast({ type: 'success', message: `Order #${orderId} completed` });
+      const label =
+        action === 'accept'
+          ? 'accepted'
+          : action === 'picked_up'
+            ? 'picked up'
+            : action === 'delivered'
+              ? 'delivered'
+              : 'updated';
+      toast({ type: 'success', message: `Order #${orderId} ${label}` });
     } catch (e) {
       toast({ type: 'error', message: e.message, persist: true });
     } finally {
@@ -205,10 +194,29 @@ const Orders = () => {
   };
 
   const tabItems = [
-    { key: 'READY', label: 'Ready' },
     { key: 'ACTIVE', label: 'Active' },
     { key: 'COMPLETED', label: 'Completed' },
   ];
+
+  const toggleAvailability = async () => {
+    if (availability === null) return;
+    const next = !availability;
+    setAvailability(next);
+    setAvailabilityLoading(true);
+    try {
+      const data = await apiPatch('/driver/me/availability', { is_available: next });
+      setAvailability(Boolean(data.is_available));
+      toast({
+        type: 'success',
+        message: `Availability ${data.is_available ? 'enabled' : 'disabled'}`,
+      });
+    } catch (e) {
+      setAvailability(!next);
+      toast({ type: 'error', message: e.message, persist: true });
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -220,7 +228,18 @@ const Orders = () => {
             Showing {visibleOrders.length} of {counts.ALL} orders
           </div>
         </div>
-        <div className="flex items-center gap-4 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+          <button
+            onClick={toggleAvailability}
+            disabled={availability === null || availabilityLoading}
+            className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.2em] transition ${
+              availability
+                ? 'accent-pill'
+                : 'border-white/10 text-slate-400 hover:border-white/20'
+            }`}
+          >
+            {availabilityLoading ? 'Saving...' : `Available ${availability ? 'On' : 'Off'}`}
+          </button>
           <span>{lastUpdatedLabel}</span>
           <button
             onClick={() => setAutoRefreshEnabled((prev) => !prev)}
@@ -300,9 +319,14 @@ const Orders = () => {
             const deliveryLabel = formatCurrencyGHS(deliveryFee, totals.delivery_fee_ghs);
             const totalLabel = formatCurrencyGHS(total, totals.total_ghs);
             const showBreakdown = itemsLabel && deliveryLabel && totalLabel;
-            const canonical = canonicalStatus(o.status);
-            const isReady = canonical === 'READY';
-            const isActive = canonical === 'ASSIGNED';
+            const rawStatus = o.status ? o.status.toString().trim().toLowerCase() : '';
+            const driverStatus = o.driver_status ? o.driver_status.toString().trim().toLowerCase() : '';
+            const isAssigned = rawStatus === 'assigned';
+            const isPickedUp = rawStatus === 'picked_up';
+            const canAccept = isAssigned && (!driverStatus || driverStatus === 'assigned');
+            const canPickup =
+              isAssigned && (driverStatus === 'accepted' || driverStatus === 'assigned');
+            const canDeliver = isPickedUp;
             const isLoading = actionLoading[o.id];
 
             return (
@@ -359,22 +383,31 @@ const Orders = () => {
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
-                    {isReady && (
+                    {canAccept && (
                       <button
-                        onClick={() => claimOrder(o)}
+                        onClick={() => updateOrderStatus(o, 'accept')}
                         disabled={Boolean(isLoading)}
                         className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
-                        {isLoading ? 'Claiming...' : 'Claim'}
+                        {isLoading ? 'Updating...' : 'Accept'}
                       </button>
                     )}
-                    {isActive && (
+                    {canPickup && (
                       <button
-                        onClick={() => completeOrder(o)}
+                        onClick={() => updateOrderStatus(o, 'picked_up')}
                         disabled={Boolean(isLoading)}
                         className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
-                        {isLoading ? 'Completing...' : 'Complete'}
+                        {isLoading ? 'Updating...' : 'Picked up'}
+                      </button>
+                    )}
+                    {canDeliver && (
+                      <button
+                        onClick={() => updateOrderStatus(o, 'delivered')}
+                        disabled={Boolean(isLoading)}
+                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
+                      >
+                        {isLoading ? 'Updating...' : 'Delivered'}
                       </button>
                     )}
                   </div>

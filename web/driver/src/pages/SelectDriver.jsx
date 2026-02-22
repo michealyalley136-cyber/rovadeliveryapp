@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { publicGet, setDriverListCache, setSelectedDriverId } from '../api/client';
+import { publicGet, setDriverListCache, setSelectedDriverId, consumeAuthMessage } from '../api/client';
 import { useToast } from '../components/ToastProvider';
 
 const SelectDriver = () => {
@@ -27,6 +27,13 @@ const SelectDriver = () => {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    const message = consumeAuthMessage();
+    if (message) {
+      toast({ type: 'error', message });
+    }
+  }, [toast]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

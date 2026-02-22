@@ -64,7 +64,7 @@
 }
 
 .searchCard:focus-within{
-  outline: 3px solid rgba(255,106,0,0.25);
+  outline: 3px solid var(--focus-ring);
   border-color: transparent;
 }
 
@@ -96,8 +96,8 @@
 
 .vendorSearchInput:focus{
   outline: none;
-  border-color: rgba(255, 106, 0, 0.45);
-  background: #fff;
+  border-color: var(--focus-border);
+  background: var(--color-surface);
 }
 
 .searchPill{
@@ -108,7 +108,7 @@
   font-weight: 700;
   color: var(--rova-orange);
   background: var(--orange-tint);
-  border: 1px solid rgba(255,106,0,0.35);
+  border: 1px solid var(--accent-border);
   border-radius: 999px;
   padding: 8px 12px;
 }
@@ -126,19 +126,19 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .filterChip.active{
   background: var(--green-tint);
-  border-color: rgba(31,143,58,0.35);
-  color: var(--rova-green);
+  border-color: var(--success-border);
+  color: var(--color-secondary);
 }
 
 .filterChip.orange{
   background: var(--orange-tint);
-  border-color: rgba(255,106,0,0.35);
-  color: var(--rova-orange);
+  border-color: var(--accent-border);
+  color: var(--color-primary);
 }
 
 .featuredSection{
@@ -188,14 +188,14 @@
 .featuredOverlay{
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.55), transparent 60%);
+  background: linear-gradient(to top, var(--overlay-dark-strong), transparent 60%);
 }
 
 .featuredContent{
   position: absolute;
   left: 18px;
   bottom: 18px;
-  color: #fff;
+  color: var(--color-primary-foreground);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -215,8 +215,8 @@
   position: absolute;
   top: 14px;
   left: 14px;
-  background: rgba(31,143,58,0.95);
-  color: #fff;
+  background: var(--badge-success-bg);
+  color: var(--color-primary-foreground);
   font-weight: 800;
   font-size: 11px;
   padding: 6px 10px;
@@ -282,7 +282,7 @@
 .vendorImageWrapper{
   position: relative;
   height: 128px;
-  background: linear-gradient(135deg, rgba(255,106,0,0.08), rgba(31,143,58,0.08));
+  background: linear-gradient(135deg, var(--orange-tint), var(--green-tint));
 }
 
 .featuredSpan .vendorImageWrapper{
@@ -311,15 +311,15 @@
 .imageGradientOverlay{
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.5), transparent 60%);
+  background: linear-gradient(to top, var(--overlay-dark), transparent 60%);
 }
 
 .promoBadge{
   position: absolute;
   top: 12px;
   left: 12px;
-  background: rgba(31,143,58,0.95);
-  color: white;
+  background: var(--badge-success-bg);
+  color: var(--color-primary-foreground);
   font-weight: 800;
   font-size: 12px;
   padding: 8px 12px;
@@ -330,8 +330,8 @@
   position: absolute;
   top: 12px;
   left: 12px;
-  background: rgba(107,114,128,0.9);
-  color: #fff;
+  background: var(--badge-muted-bg);
+  color: var(--color-primary-foreground);
   font-weight: 800;
   font-size: 11px;
   padding: 6px 10px;
@@ -342,8 +342,8 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  background: rgba(17,24,39,0.85);
-  color: white;
+  background: var(--badge-ink-bg);
+  color: var(--color-primary-foreground);
   font-weight: 800;
   font-size: 11px;
   padding: 6px 10px;
@@ -354,8 +354,8 @@
   position: absolute;
   bottom: 12px;
   left: 12px;
-  background: rgba(255,106,0,0.92);
-  color: #fff;
+  background: var(--badge-primary-bg);
+  color: var(--color-primary-foreground);
   font-weight: 800;
   font-size: 11px;
   padding: 6px 10px;
@@ -366,13 +366,13 @@
   position: absolute;
   bottom: 12px;
   left: 12px;
-  background: rgba(255,106,0,0.92);
-  color: #fff;
+  background: var(--badge-primary-bg);
+  color: var(--color-primary-foreground);
   font-weight: 900;
   font-size: 12px;
   padding: 8px 12px;
   border-radius: 999px;
-  box-shadow: 0 10px 22px rgba(17,24,39,0.18);
+  box-shadow: var(--shadow-pill);
 }
 
 .vendorContent{
@@ -452,12 +452,12 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 6px 12px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .vendorCta:hover{
-  border-color: rgba(255,106,0,0.4);
-  color: var(--rova-orange-dark);
+  border-color: var(--accent-border);
+  color: var(--color-primary-hover);
 }
 
 .vendorsEmpty{
@@ -470,7 +470,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 18px;
@@ -528,7 +528,7 @@
 }
 
 .skeleton{
-  background: linear-gradient(90deg, #eee, #f5f5f5, #eee);
+  background: linear-gradient(90deg, var(--skeleton-base), var(--skeleton-highlight), var(--skeleton-base));
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
 }

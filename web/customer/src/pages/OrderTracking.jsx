@@ -5,7 +5,17 @@ import { apiGet } from '../api/client';
 import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/ToastProvider';
 
-const STATUS_FLOW = ['NEW', 'PREPARING', 'READY', 'ASSIGNED', 'COMPLETED'];
+const STATUS_FLOW = ['new', 'preparing', 'ready', 'assigned', 'picked_up', 'delivered', 'cancelled'];
+
+const formatStatusLabel = (status) => {
+  if (!status) return '-';
+  return status
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
 
 const getTokenForOrder = (orderId, queryToken) => {
   if (queryToken) {
@@ -109,6 +119,10 @@ const OrderTracking = () => {
     return STATUS_FLOW.filter((s) => seen.has(s) || s === order.status);
   }, [order]);
 
+  const driverLocation = order?.driver_location;
+  const hasDriverLocation =
+    driverLocation && driverLocation.lat != null && driverLocation.lng != null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -158,6 +172,19 @@ const OrderTracking = () => {
             </div>
 
             <div className="rounded-xl border border-white/10 p-4">
+              <div className="text-xs text-slate-400">Live tracking</div>
+              <div className="mt-2 text-sm text-slate-200">Live map coming soon</div>
+              {hasDriverLocation ? (
+                <div className="mt-2 text-xs text-slate-400">
+                  Last location: {driverLocation.lat}, {driverLocation.lng}
+                  {driverLocation.updated_at ? ` • ${formatTime(driverLocation.updated_at)}` : ''}
+                </div>
+              ) : (
+                <div className="mt-2 text-xs text-slate-500">Driver location not available yet</div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-white/10 p-4">
               <div className="text-xs text-slate-400">Timeline</div>
               <div className="mt-3 space-y-2 text-sm text-slate-300">
                 {STATUS_FLOW.map((status) => {
@@ -165,7 +192,9 @@ const OrderTracking = () => {
                   const isActive = order.status === status;
                   return (
                     <div key={status} className="flex items-center justify-between">
-                      <span className={isActive ? 'text-white' : ''}>{status}</span>
+                      <span className={isActive ? 'text-white' : ''}>
+                        {formatStatusLabel(status)}
+                      </span>
                       <span className="text-xs text-slate-500">
                         {entry ? formatTime(entry.timestamp) : '-'}
                       </span>
@@ -201,6 +230,10 @@ const OrderTracking = () => {
                 <div className="flex items-center justify-between">
                   <span>Delivery fee</span>
                   <span>GHS {order.totals?.delivery_fee?.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Service fee</span>
+                  <span>GHS {order.totals?.service_fee?.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-white">
                   <span>Total</span>

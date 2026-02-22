@@ -73,7 +73,7 @@ const Vendors = () => {
       setVendors(withFeatured);
     } catch (e) {
       toast({ type: 'error', message: e.message, persist: true });
-      setError('We could not load vendors right now. Please try again.');
+      setError(e.message || 'We could not load vendors right now. Please try again.');
     } finally {
       setLoading(false);
     }

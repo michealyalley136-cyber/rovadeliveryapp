@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
+import BackendStatusBanner from './components/BackendStatusBanner';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/ToastProvider';
 import Vendors from './pages/Vendors';
@@ -12,6 +13,7 @@ import Success from './pages/Success';
 const App = () => {
   return (
     <ToastProvider>
+      <BackendStatusBanner />
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Vendors />} />

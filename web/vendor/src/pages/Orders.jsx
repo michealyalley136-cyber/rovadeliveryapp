@@ -40,29 +40,52 @@ const formatClock = (date) => {
   return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 };
 
-const canonicalStatus = (status) => {
-  const map = {
-    Created: 'NEW',
-    SentToVendor: 'NEW',
-    Accepted: 'PREPARING',
-    Preparing: 'PREPARING',
-    Ready: 'READY',
-    Assigned: 'ASSIGNED',
-    PickedUp: 'ASSIGNED',
-    Delivered: 'COMPLETED',
-  };
-  return map[status] || status;
+const formatPaymentMethod = (value) => {
+  const key = (value || '').toString().trim().toLowerCase();
+  if (key === 'momo') return 'MoMo';
+  if (key === 'card') return 'Card';
+  if (key === 'cash') return 'Cash';
+  return value || '-';
 };
 
-const internalFromCanonical = (status) => {
-  const map = {
-    PREPARING: 'Preparing',
-    READY: 'Ready',
-    ASSIGNED: 'Assigned',
-    COMPLETED: 'Delivered',
-  };
-  return map[status] || status;
+const formatPaymentStatus = (value) => {
+  const key = (value || '').toString().trim().toLowerCase();
+  if (!key) return '-';
+  return key.charAt(0).toUpperCase() + key.slice(1);
 };
+
+const isAwaitingPayment = (method, status) => {
+  const key = (method || '').toString().trim().toLowerCase();
+  const payment = (status || '').toString().trim().toLowerCase();
+  return (key === 'momo' || key === 'card') && payment !== 'paid';
+};
+
+const normalizeStatus = (status) => {
+  if (!status) return 'unknown';
+  const key = status.toString().trim().toLowerCase().replace(/\s+/g, '_');
+  const map = {
+    created: 'placed',
+    sent_to_vendor: 'placed',
+    senttovendor: 'placed',
+    new: 'placed',
+    placed: 'placed',
+    accepted: 'accepted',
+    preparing: 'preparing',
+    ready: 'ready',
+    assigned: 'assigned',
+    picked_up: 'picked_up',
+    pickedup: 'picked_up',
+    delivered: 'delivered',
+    completed: 'delivered',
+    declined: 'declined',
+    cancelled: 'cancelled',
+    canceled: 'cancelled',
+    needs_reassign: 'ready',
+  };
+  return map[key] || 'unknown';
+};
+
+const canonicalStatus = (status) => normalizeStatus(status).toUpperCase();
 
 const Orders = () => {
   const { toast } = useToast();
@@ -72,7 +95,9 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
   const [activeTab, setActiveTab] = useState(() => {
-    return sessionStorage.getItem('vendorOrdersActiveTab') || 'ALL';
+    const stored = sessionStorage.getItem('vendorOrdersActiveTab') || 'ALL';
+    const legacy = { NEW: 'PLACED', COMPLETED: 'DELIVERED' };
+    return legacy[stored] || stored;
   });
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() => {
     const stored = sessionStorage.getItem('vendorOrdersAutoRefresh');
@@ -89,7 +114,7 @@ const Orders = () => {
     setLoading(true);
     try {
       const data = await apiGet(
-        '/vendor/orders?statuses=Created,SentToVendor,Accepted,Preparing,Ready,Assigned,Delivered'
+        '/vendor/orders?statuses=placed,accepted,preparing,ready,assigned,picked_up,delivered,declined,cancelled'
       );
       const nextOrders = data.orders || [];
       setOrders(nextOrders);
@@ -188,7 +213,16 @@ const Orders = () => {
 
   const updateStatus = async (order, nextStatus) => {
     const orderId = order.id;
-    const optimisticStatus = internalFromCanonical(nextStatus);
+    const awaitingPayment = isAwaitingPayment(order.payment_method, order.payment_status);
+    if (
+      awaitingPayment &&
+      nextStatus !== 'declined' &&
+      nextStatus !== 'cancelled'
+    ) {
+      toast({ type: 'error', message: 'Awaiting payment before continuing.' });
+      return;
+    }
+    const optimisticStatus = nextStatus;
     const prevOrders = orders;
     const prevSelected = selectedOrder;
     setActionLoading((prev) => ({ ...prev, [orderId]: nextStatus }));
@@ -201,7 +235,7 @@ const Orders = () => {
     }
 
     try {
-      const data = await apiPatch(`/vendor/orders/${orderId}/status`, { status: nextStatus });
+      const data = await apiPatch(`/vendor/orders/${orderId}`, { status: nextStatus });
       setOrders((prev) => prev.map((o) => (o.id === orderId ? data : o)));
       if (selectedOrder?.id === orderId) {
         setSelectedOrder(data);
@@ -228,11 +262,15 @@ const Orders = () => {
   const counts = useMemo(() => {
     const base = {
       ALL: orders.length,
-      NEW: 0,
+      PLACED: 0,
+      ACCEPTED: 0,
       PREPARING: 0,
       READY: 0,
       ASSIGNED: 0,
-      COMPLETED: 0,
+      PICKED_UP: 0,
+      DELIVERED: 0,
+      DECLINED: 0,
+      CANCELLED: 0,
     };
     orders.forEach((o) => {
       const canonical = canonicalStatus(o.status);
@@ -250,11 +288,15 @@ const Orders = () => {
 
   const tabItems = [
     { key: 'ALL', label: 'All' },
-    { key: 'NEW', label: 'New' },
+    { key: 'PLACED', label: 'Placed' },
+    { key: 'ACCEPTED', label: 'Accepted' },
     { key: 'PREPARING', label: 'Preparing' },
     { key: 'READY', label: 'Ready' },
     { key: 'ASSIGNED', label: 'Assigned' },
-    { key: 'COMPLETED', label: 'Completed' },
+    { key: 'PICKED_UP', label: 'Picked up' },
+    { key: 'DELIVERED', label: 'Delivered' },
+    { key: 'DECLINED', label: 'Declined' },
+    { key: 'CANCELLED', label: 'Cancelled' },
   ];
 
   return (
@@ -335,22 +377,26 @@ const Orders = () => {
           </div>
         ) : (
           visibleOrders.map((o) => {
-            const canonical = canonicalStatus(o.status);
+            const normalized = normalizeStatus(o.status);
             const placedAt = o.created_at ? new Date(o.created_at) : null;
             const itemsSubtotal =
               o.subtotal_cents ??
               (o.items || []).reduce((sum, item) => sum + item.unit_price_cents * item.quantity, 0);
             const deliveryFee = o.delivery_fee_cents ?? null;
             const total = o.total_cents ?? (deliveryFee !== null ? itemsSubtotal + deliveryFee : itemsSubtotal);
+            const awaitingPayment = isAwaitingPayment(o.payment_method, o.payment_status);
 
             const itemsLabel = formatCurrencyGHS(itemsSubtotal, o.subtotal_ghs);
             const deliveryLabel = formatCurrencyGHS(deliveryFee, o.delivery_fee_ghs);
             const totalLabel = formatCurrencyGHS(total, o.total_ghs);
             const showBreakdown = itemsLabel && deliveryLabel && totalLabel;
 
-            const canStartPreparing = canonical === 'NEW';
-            const canMarkReady = canonical === 'PREPARING';
-            const canComplete = canonical === 'READY' && !o.driver_id;
+            const canAccept = normalized === 'placed' && !awaitingPayment;
+            const canDecline = normalized === 'placed';
+            const canStartPreparing = normalized === 'accepted' && !awaitingPayment;
+            const canMarkReady = normalized === 'preparing' && !awaitingPayment;
+            const canMarkPickedUp = normalized === 'ready' && !awaitingPayment;
+            const canMarkDelivered = normalized === 'picked_up' && !awaitingPayment;
             const isActionLoading = actionLoading[o.id];
 
             return (
@@ -369,8 +415,18 @@ const Orders = () => {
                     <div className="mt-2 text-xs text-slate-400">
                       Placed: {timeAgo(placedAt)} | {formatTime(placedAt)}
                     </div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      Payment: {formatPaymentMethod(o.payment_method)} â€¢ {formatPaymentStatus(o.payment_status)}
+                    </div>
                   </div>
-                  <StatusChip status={o.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusChip status={o.status} />
+                    {awaitingPayment && (
+                      <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-[10px] text-amber-200">
+                        Awaiting Payment
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -411,9 +467,27 @@ const Orders = () => {
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-2">
+                    {canAccept && (
+                      <button
+                        onClick={() => updateStatus(o, 'accepted')}
+                        disabled={Boolean(isActionLoading)}
+                        className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
+                      >
+                        {isActionLoading ? 'Updating...' : 'Accept'}
+                      </button>
+                    )}
+                    {canDecline && (
+                      <button
+                        onClick={() => updateStatus(o, 'declined')}
+                        disabled={Boolean(isActionLoading)}
+                        className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-200 hover:border-red-500/70 disabled:opacity-60"
+                      >
+                        {isActionLoading ? 'Updating...' : 'Decline'}
+                      </button>
+                    )}
                     {canStartPreparing && (
                       <button
-                        onClick={() => updateStatus(o, 'PREPARING')}
+                        onClick={() => updateStatus(o, 'preparing')}
                         disabled={Boolean(isActionLoading)}
                         className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
@@ -422,23 +496,32 @@ const Orders = () => {
                     )}
                     {canMarkReady && (
                       <button
-                        onClick={() => updateStatus(o, 'READY')}
+                        onClick={() => updateStatus(o, 'ready')}
                         disabled={Boolean(isActionLoading)}
                         className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
                         {isActionLoading ? 'Updating...' : 'Mark Ready'}
                       </button>
                     )}
-                    {canComplete && (
+                    {canMarkPickedUp && (
                       <button
-                        onClick={() => updateStatus(o, 'COMPLETED')}
+                        onClick={() => updateStatus(o, 'picked_up')}
                         disabled={Boolean(isActionLoading)}
                         className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                       >
-                        {isActionLoading ? 'Updating...' : 'Complete'}
+                        {isActionLoading ? 'Updating...' : 'Picked Up'}
                       </button>
                     )}
-                    {(canonical === 'ASSIGNED' || (canonical === 'READY' && o.driver_id)) && (
+                    {canMarkDelivered && (
+                      <button
+                        onClick={() => updateStatus(o, 'delivered')}
+                        disabled={Boolean(isActionLoading)}
+                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
+                      >
+                        {isActionLoading ? 'Updating...' : 'Delivered'}
+                      </button>
+                    )}
+                    {normalized === 'assigned' && (
                       <span className="text-xs text-slate-300">Driver assigned</span>
                     )}
                   </div>
@@ -465,8 +548,18 @@ const Orders = () => {
                 <div className="mt-1 text-xs text-slate-400">
                   Placed: {formatTime(selectedOrder.created_at ? new Date(selectedOrder.created_at) : null)}
                 </div>
+                <div className="mt-1 text-xs text-slate-400">
+                  Payment: {formatPaymentMethod(selectedOrder.payment_method)} â€¢ {formatPaymentStatus(selectedOrder.payment_status)}
+                </div>
               </div>
-              <StatusChip status={selectedOrder.status} />
+              <div className="flex items-center gap-2">
+                <StatusChip status={selectedOrder.status} />
+                {isAwaitingPayment(selectedOrder.payment_method, selectedOrder.payment_status) && (
+                  <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-[10px] text-amber-200">
+                    Awaiting Payment
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -516,17 +609,42 @@ const Orders = () => {
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <div className="flex gap-2">
                 {(() => {
-                  const canonical = canonicalStatus(selectedOrder.status);
-                  const canStartPreparing = canonical === 'NEW';
-                  const canMarkReady = canonical === 'PREPARING';
-                  const canComplete = canonical === 'READY' && !selectedOrder.driver_id;
+                  const normalized = normalizeStatus(selectedOrder.status);
+                  const awaitingPayment = isAwaitingPayment(
+                    selectedOrder.payment_method,
+                    selectedOrder.payment_status
+                  );
+                  const canAccept = normalized === 'placed' && !awaitingPayment;
+                  const canDecline = normalized === 'placed';
+                  const canStartPreparing = normalized === 'accepted' && !awaitingPayment;
+                  const canMarkReady = normalized === 'preparing' && !awaitingPayment;
+                  const canMarkPickedUp = normalized === 'ready' && !awaitingPayment;
+                  const canMarkDelivered = normalized === 'picked_up' && !awaitingPayment;
                   const isActionLoading = actionLoading[selectedOrder.id];
 
                   return (
                     <>
+                      {canAccept && (
+                        <button
+                          onClick={() => updateStatus(selectedOrder, 'accepted')}
+                          disabled={Boolean(isActionLoading)}
+                          className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
+                        >
+                          {isActionLoading ? 'Updating...' : 'Accept'}
+                        </button>
+                      )}
+                      {canDecline && (
+                        <button
+                          onClick={() => updateStatus(selectedOrder, 'declined')}
+                          disabled={Boolean(isActionLoading)}
+                          className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-200 hover:border-red-500/70 disabled:opacity-60"
+                        >
+                          {isActionLoading ? 'Updating...' : 'Decline'}
+                        </button>
+                      )}
                       {canStartPreparing && (
                         <button
-                          onClick={() => updateStatus(selectedOrder, 'PREPARING')}
+                          onClick={() => updateStatus(selectedOrder, 'preparing')}
                           disabled={Boolean(isActionLoading)}
                           className="btn-primary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                         >
@@ -535,23 +653,32 @@ const Orders = () => {
                       )}
                       {canMarkReady && (
                         <button
-                          onClick={() => updateStatus(selectedOrder, 'READY')}
+                          onClick={() => updateStatus(selectedOrder, 'ready')}
                           disabled={Boolean(isActionLoading)}
                           className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                         >
                           {isActionLoading ? 'Updating...' : 'Mark Ready'}
                         </button>
                       )}
-                      {canComplete && (
+                      {canMarkPickedUp && (
                         <button
-                          onClick={() => updateStatus(selectedOrder, 'COMPLETED')}
+                          onClick={() => updateStatus(selectedOrder, 'picked_up')}
                           disabled={Boolean(isActionLoading)}
                           className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
                         >
-                          {isActionLoading ? 'Updating...' : 'Complete'}
+                          {isActionLoading ? 'Updating...' : 'Picked Up'}
                         </button>
                       )}
-                      {(canonical === 'ASSIGNED' || (canonical === 'READY' && selectedOrder.driver_id)) && (
+                      {canMarkDelivered && (
+                        <button
+                          onClick={() => updateStatus(selectedOrder, 'delivered')}
+                          disabled={Boolean(isActionLoading)}
+                          className="btn-secondary rounded-lg px-3 py-1.5 text-xs disabled:opacity-60"
+                        >
+                          {isActionLoading ? 'Updating...' : 'Delivered'}
+                        </button>
+                      )}
+                      {normalized === 'assigned' && (
                         <span className="text-xs text-slate-300">Driver assigned</span>
                       )}
                     </>

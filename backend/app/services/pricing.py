@@ -2,7 +2,7 @@
 import math
 from sqlalchemy.exc import SQLAlchemyError
 from ..extensions import db
-from ..models import DeliveryPricingConfig
+from ..models import DeliveryPricingConfig, Vendor
 
 # Earth radius in km
 _EARTH_RADIUS_KM = 6371.0
@@ -46,6 +46,8 @@ def get_active_pricing_config():
             base_km=3.0,
             base_fee_ghs=12,
             per_km_fee_ghs=2,
+            service_fee_percent=0,
+            minimum_service_fee_ghs=0,
         )
         db.session.add(config)
         db.session.commit()
@@ -55,7 +57,7 @@ def get_active_pricing_config():
         return None
 
 
-def compute_delivery_fee(distance_km: float, config) -> float:
+def compute_delivery_fee(distance_km: float | None, config) -> float:
     """
     Compute delivery fee in GHS from distance and config.
     config: DeliveryPricingConfig row or dict with base_km, base_fee_ghs, per_km_fee_ghs.
@@ -63,17 +65,87 @@ def compute_delivery_fee(distance_km: float, config) -> float:
     if config is None:
         return 12.0  # default base
     if hasattr(config, "base_km"):
-        base_km = float(config.base_km)
-        base_fee_ghs = float(config.base_fee_ghs)
-        per_km_fee_ghs = float(config.per_km_fee_ghs)
+        base_km = float(config.base_km or 0)
+        base_fee_ghs = float(config.base_fee_ghs or 0)
+        per_km_fee_ghs = float(getattr(config, "per_km_fee_ghs", 0) or 0)
     else:
-        base_km = float(config["base_km"])
-        base_fee_ghs = float(config["base_fee_ghs"])
-        per_km_fee_ghs = float(config["per_km_fee_ghs"])
-    if distance_km <= base_km:
+        base_km = float(config.get("base_km") or 0)
+        base_fee_ghs = float(config.get("base_fee_ghs") or 0)
+        per_km_fee_ghs = float(config.get("per_km_fee_ghs") or 0)
+    if distance_km is None:
+        return base_fee_ghs
+    if distance_km <= base_km or per_km_fee_ghs <= 0:
         return base_fee_ghs
     extra_km = distance_km - base_km
     return base_fee_ghs + extra_km * per_km_fee_ghs
+
+
+def get_fee_rules(vendor: Vendor | None = None) -> dict:
+    """Resolve delivery + service fee rules (vendor overrides > global config > defaults)."""
+    config = get_active_pricing_config()
+
+    base_km = float(getattr(config, "base_km", 3.0) or 3.0)
+    base_delivery_fee = (
+        vendor.base_delivery_fee_ghs
+        if vendor and vendor.base_delivery_fee_ghs is not None
+        else getattr(config, "base_fee_ghs", 12.0)
+    )
+    per_km_fee = (
+        vendor.per_km_fee_ghs
+        if vendor and vendor.per_km_fee_ghs is not None
+        else getattr(config, "per_km_fee_ghs", 0.0)
+    )
+    service_fee_percent = (
+        vendor.service_fee_percent
+        if vendor and vendor.service_fee_percent is not None
+        else getattr(config, "service_fee_percent", 0.0)
+    )
+    minimum_service_fee = (
+        vendor.minimum_service_fee_ghs
+        if vendor and vendor.minimum_service_fee_ghs is not None
+        else getattr(config, "minimum_service_fee_ghs", 0.0)
+    )
+
+    return {
+        "base_km": float(base_km),
+        "base_delivery_fee_ghs": float(base_delivery_fee or 0),
+        "per_km_fee_ghs": float(per_km_fee or 0),
+        "service_fee_percent": float(service_fee_percent or 0),
+        "minimum_service_fee_ghs": float(minimum_service_fee or 0),
+    }
+
+
+def compute_service_fee(subtotal_ghs: float, service_fee_percent: float, minimum_service_fee_ghs: float) -> float:
+    if subtotal_ghs <= 0:
+        return 0.0
+    fee = subtotal_ghs * (service_fee_percent / 100.0)
+    if fee < minimum_service_fee_ghs:
+        fee = minimum_service_fee_ghs
+    return round(fee, 2)
+
+
+def calculate_fee_breakdown(subtotal_ghs: float, distance_km: float | None, vendor: Vendor | None = None) -> dict:
+    rules = get_fee_rules(vendor)
+    delivery_fee = compute_delivery_fee(
+        distance_km,
+        {
+            "base_km": rules["base_km"],
+            "base_fee_ghs": rules["base_delivery_fee_ghs"],
+            "per_km_fee_ghs": rules["per_km_fee_ghs"],
+        },
+    )
+    service_fee = compute_service_fee(
+        subtotal_ghs,
+        rules["service_fee_percent"],
+        rules["minimum_service_fee_ghs"],
+    )
+    total = round(subtotal_ghs + delivery_fee + service_fee, 2)
+    return {
+        "delivery_fee_ghs": round(delivery_fee, 2),
+        "service_fee_ghs": round(service_fee, 2),
+        "total_ghs": total,
+        "rules": rules,
+    }
 
 
 # Legacy helpers (for backward compat with old Config key/value if still used elsewhere)

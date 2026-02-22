@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { publicGet, setSelectedVendorId, setVendorListCache } from '../api/client';
+import { publicGet, setSelectedVendor, setVendorListCache, consumeAuthMessage } from '../api/client';
 import { useToast } from '../components/ToastProvider';
 
 const SelectVendor = () => {
@@ -10,15 +10,18 @@ const SelectVendor = () => {
   const [vendors, setVendors] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = async () => {
     setLoading(true);
+    setError('');
     try {
-      const data = await publicGet('/vendors');
+      const data = await publicGet('/public/vendors');
       setVendors(data.vendors || []);
       setVendorListCache(data.vendors || []);
     } catch (e) {
       toast({ type: 'error', message: e.message });
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -28,6 +31,13 @@ const SelectVendor = () => {
     load();
   }, []);
 
+  useEffect(() => {
+    const message = consumeAuthMessage();
+    if (message) {
+      toast({ type: 'error', message });
+    }
+  }, [toast]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return vendors;
@@ -35,7 +45,7 @@ const SelectVendor = () => {
   }, [vendors, search]);
 
   const selectVendor = (vendor) => {
-    setSelectedVendorId(vendor.id);
+    setSelectedVendor(vendor.id, vendor.name);
     navigate('/vendor/pin');
   };
 
@@ -64,6 +74,16 @@ const SelectVendor = () => {
         <div className="rova-card glass rounded-2xl p-6">
           {loading ? (
             <div className="text-sm text-slate-400">Loading vendors...</div>
+          ) : error ? (
+            <div className="space-y-2 text-sm text-slate-300">
+              <div className="text-red-300">{error}</div>
+              <button
+                onClick={load}
+                className="btn-primary rounded-lg px-3 py-1.5 text-xs"
+              >
+                Retry
+              </button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="text-sm text-slate-400">No vendors found.</div>
           ) : (

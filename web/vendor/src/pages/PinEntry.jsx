@@ -5,6 +5,7 @@ import {
   apiPost,
   publicGet,
   getSelectedVendorId,
+  getSelectedVendorName,
   setVendorSession,
   clearVendorState,
   getVendorListCache,
@@ -16,7 +17,7 @@ const PinEntry = () => {
   const navigate = useNavigate();
   const { toast, clearPersistentError } = useToast();
   const [vendorId, setVendorId] = useState(getSelectedVendorId());
-  const [vendorName, setVendorName] = useState('');
+  const [vendorName, setVendorName] = useState(getSelectedVendorName());
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,7 +37,7 @@ const PinEntry = () => {
     }
     const loadVendor = async () => {
       try {
-        const data = await publicGet('/vendors');
+        const data = await publicGet('/public/vendors');
         const vendors = data.vendors || [];
         setVendorListCache(vendors);
         const match = vendors.find((v) => String(v.id) === String(vendorId));
@@ -53,7 +54,7 @@ const PinEntry = () => {
       } catch (e) {
         toast({
           type: 'error',
-          message: 'Unable to load vendor details. Please retry.',
+          message: e.message || 'Unable to load vendor details. Please retry.',
           persist: true,
         });
       }
@@ -66,15 +67,15 @@ const PinEntry = () => {
   const submit = async (e) => {
     e.preventDefault();
     const trimmed = pin.trim();
-    if (!/^\d{4,6}$/.test(trimmed)) {
-      setError('PIN must be 4 to 6 digits.');
+    if (!/^\d{4}$/.test(trimmed)) {
+      setError('PIN must be exactly 4 digits.');
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const data = await apiPost(`/vendors/${vendorId}/verify-pin`, { pin: trimmed }, { auth: false });
-      setVendorSession(data.token, data.vendorId || vendorId);
+      const data = await apiPost('/vendor/auth/pin', { vendor_id: vendorId, pin: trimmed }, { auth: false });
+      setVendorSession(data.token, data.vendor?.id || vendorId, data.vendor?.name || vendorName);
       clearPersistentError();
       navigate('/vendor/dashboard');
     } catch (e) {
@@ -133,7 +134,7 @@ const PinEntry = () => {
               placeholder="1234"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={6}
+              maxLength={4}
             />
           </label>
           <button disabled={loading} className="btn-primary w-full rounded-lg px-4 py-2 text-sm">
@@ -146,7 +147,7 @@ const PinEntry = () => {
           onClick={changeVendor}
           className="mt-4 text-xs text-slate-400 hover:text-white"
         >
-          Change vendor
+          Switch vendor
         </button>
       </div>
     </div>

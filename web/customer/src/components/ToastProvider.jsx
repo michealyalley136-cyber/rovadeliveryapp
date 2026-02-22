@@ -12,13 +12,15 @@ export const ToastProvider = ({ children }) => {
 
   useEffect(() => {
     setApiHandlers({
-      onNetworkError: (message) => setPersistentError(message),
       onClear: () => setPersistentError(''),
     });
   }, []);
 
   const pushToast = useMemo(
     () => (toast) => {
+      if (!toast?.message) {
+        return;
+      }
       if (toast.persist) {
         setPersistentError(toast.message || 'Something went wrong.');
         return;

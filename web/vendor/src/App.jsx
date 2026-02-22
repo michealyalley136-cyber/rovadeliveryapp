@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { getVendorId, getVendorToken } from './api/client';
+import BackendStatusBanner from './components/BackendStatusBanner';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/ToastProvider';
 import PinEntry from './pages/PinEntry';
@@ -18,6 +19,7 @@ const RequireVendor = ({ children }) => {
 const App = () => {
   return (
     <ToastProvider>
+      <BackendStatusBanner />
       <Routes>
         <Route path="/" element={<Navigate to="/vendor/select" replace />} />
         <Route path="/vendor/select" element={<SelectVendor />} />

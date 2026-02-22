@@ -16,13 +16,26 @@ def get_pricing():
             "config": None,
             "example": {
                 "message": "No pricing config in DB. Run seed or PATCH /api/admin/pricing.",
-                "inputs": {"distance_km": 5.0, "base_km": 3.0, "base_fee_ghs": 12, "per_km_fee_ghs": 2},
+                "inputs": {
+                    "distance_km": 5.0,
+                    "base_km": 3.0,
+                    "base_fee_ghs": 12,
+                    "per_km_fee_ghs": 2,
+                    "service_fee_percent": 0,
+                    "minimum_service_fee_ghs": 0,
+                    "subtotal_ghs": 50.0,
+                },
                 "delivery_fee_ghs": 16.0,
+                "service_fee_ghs": 0.0,
             },
         })
     cfg = config.to_dict()
     example_km = 5.0
+    example_subtotal = 50.0
     example_fee = compute_delivery_fee(example_km, config)
+    service_fee = round(example_subtotal * (cfg.get("service_fee_percent", 0) / 100.0), 2)
+    if service_fee < cfg.get("minimum_service_fee_ghs", 0):
+        service_fee = cfg.get("minimum_service_fee_ghs", 0)
     return ok({
         "config": cfg,
         "example": {
@@ -31,7 +44,11 @@ def get_pricing():
                 "base_km": cfg["base_km"],
                 "base_fee_ghs": cfg["base_fee_ghs"],
                 "per_km_fee_ghs": cfg["per_km_fee_ghs"],
+                "service_fee_percent": cfg.get("service_fee_percent", 0),
+                "minimum_service_fee_ghs": cfg.get("minimum_service_fee_ghs", 0),
+                "subtotal_ghs": example_subtotal,
             },
             "delivery_fee_ghs": round(example_fee, 2),
+            "service_fee_ghs": round(service_fee, 2),
         },
     })

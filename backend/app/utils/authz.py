@@ -5,6 +5,7 @@ from flask import g, request
 from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
 
 from .responses import error
+from .jwt_errors import jwt_error_response
 
 
 def require_auth(fn):
@@ -14,8 +15,8 @@ def require_auth(fn):
             return "", 200
         try:
             verify_jwt_in_request()
-        except Exception:
-            return error("Authorization required", 401)
+        except Exception as exc:
+            return jwt_error_response(exc)
         claims = get_jwt() or {}
         role = claims.get("role") or claims.get("type")
         g.user = {"id": get_jwt_identity(), "role": role, **claims}
@@ -32,8 +33,8 @@ def require_role(*roles):
                 return "", 200
             try:
                 verify_jwt_in_request()
-            except Exception:
-                return error("Authorization required", 401)
+            except Exception as exc:
+                return jwt_error_response(exc)
             claims = get_jwt() or {}
             role = claims.get("role") or claims.get("type")
             if role not in roles:

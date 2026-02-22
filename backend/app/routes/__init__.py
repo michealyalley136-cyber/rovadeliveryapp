@@ -5,6 +5,7 @@ from .vendors import vendors_bp
 from .menu import menu_bp
 from .addresses import addresses_bp
 from .orders import orders_bp
+from .customer import customer_bp
 from .driver import driver_bp
 from .admin import admin_bp
 from .vendor import vendor_bp
@@ -19,6 +20,7 @@ def register_blueprints(app):
     app.register_blueprint(menu_bp, url_prefix="/api/vendors")
     app.register_blueprint(addresses_bp, url_prefix="/api/addresses")
     app.register_blueprint(orders_bp, url_prefix="/api/orders")
+    app.register_blueprint(customer_bp, url_prefix="/api/customer")
     app.register_blueprint(driver_bp, url_prefix="/api/driver")
     app.register_blueprint(driver_bp, url_prefix="/api/drivers", name="drivers")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
