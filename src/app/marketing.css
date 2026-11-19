@@ -188,7 +188,7 @@ html, body { overflow: hidden; height: 100%; width: 100%; }
 .campaign-slide.is-active { opacity: 1; transform: scale(1); }
 .campaign-slide.is-leaving { opacity: 0; transform: scale(1); }
 .campaign-backdrop-image { object-fit: cover; filter: blur(25px) brightness(.42) saturate(.92); transform: scale(1.08); opacity: .8; }
-.campaign-image { object-fit: contain; object-position: var(--desktop-position, center center); }
+.campaign-image { object-fit: cover; object-position: var(--desktop-position, center center); }
 .campaign-nav { z-index: 8; }
 .campaign-links>a:not(.nav-apply) { color: #fff; text-shadow: 0 1px 5px #071d3960; }
 .campaign-nav.nav-scrolled .campaign-links>a:not(.nav-apply) { color: #435163; text-shadow: none; }
