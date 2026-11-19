@@ -8,6 +8,7 @@ import deliveryCommerce from "@/images/Deliver More, Grow with ROVA-6.png";
 import serviceNetwork from "@/images/ROVA Ghana_ One Platform, Many Opportunities-7.png";
 import vehicleAccess from "@/images/Your Journey to Earning Starts Here-8.png";
 import applicationsOpen from "@/images/ROVA Ghana_ Your Next Opportunity-9.png";
+import ghardwareMarketplace from "@/images/GHARDWARE-Ghana-Marketplace-Banner-10.png";
 
 export type HeroSlide = {
   id: string;
@@ -128,6 +129,18 @@ export const heroSlides: HeroSlide[] = [
     headline: "Your next opportunity starts here.",
     ctaLabel: "Apply to ROVA",
     ctaHref: "/apply",
+    duration: 6000,
+    enabled: true,
+  },
+  {
+    id: "ghardware-marketplace",
+    image: ghardwareMarketplace,
+    alt: "GHARDWARE Ghana marketplace: building materials, tools, and supplies delivery across Ghana through ROVA.",
+    desktopPosition: "center 50%",
+    mobilePosition: "center 48%",
+    headline: "Building Ghana's future. Together.",
+    ctaLabel: "Explore GHARDWARE",
+    ctaHref: "https://ghardware.com",
     duration: 6000,
     enabled: true,
   },

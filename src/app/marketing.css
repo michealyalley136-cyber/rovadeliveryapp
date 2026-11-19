@@ -208,10 +208,10 @@ html, body { overflow: hidden; height: 100%; width: 100%; }
 }
 .campaign-nav:not(.nav-scrolled) .campaign-logo { text-shadow: 0 1px 9px #071d3970; }
 .campaign-nav:not(.nav-scrolled) .nav-apply { box-shadow: 0 4px 16px #071d3945; }
-.campaign-backdrop-image { transition: opacity 1000ms ease; }
+.campaign-backdrop-image { transition: opacity 1000ms ease; opacity: 0; }
 .campaign-slide.is-active .campaign-backdrop-image { opacity: .8; }
 .campaign-slide.is-leaving .campaign-backdrop-image { opacity: 0; }
-.campaign-image { transition: opacity 1000ms ease; }
+.campaign-image { transition: opacity 1000ms ease; opacity: 0; }
 .campaign-slide.is-active .campaign-image { opacity: 1; }
 .campaign-slide.is-leaving .campaign-image { opacity: 0; }
 .apply-page { min-height: 100vh; color: #17243a; background: #f7f6f1; }
