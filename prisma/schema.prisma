@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  CLOSED
+}
+
+enum OperatorStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  DOCUMENTS_REQUIRED
+  TRAINING_REQUIRED
+  APPROVED
+  REJECTED
+  READY_FOR_ACTIVATION
+  ACTIVE
+}
+
+enum TripStatus {
+  REQUESTED
+  SEARCHING
+  RIDER_ASSIGNED
+  RIDER_EN_ROUTE
+  RIDER_ARRIVED
+  TRIP_STARTED
+  TRIP_COMPLETED
+  CANCELLED
+  EMERGENCY
+}
+
+enum ServiceType {
+  RIDE
+  TAXI
+  FOOD
+  DELIVERY
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  CAR
+  VAN
+  OTHER
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ASSIGNED
+  ACTIVE
+  MAINTENANCE_DUE
+  MAINTENANCE_HOLD
+  ACCIDENT_HOLD
+  COMPLIANCE_HOLD
+  REPOSSESSION
+  RETIRED
+}
+
+enum ComplianceStatus {
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+  MISSING
+  UNDER_REVIEW
+}
+
+enum LedgerType {
+  CREDIT
+  DEBIT
+}
+
+enum ApplicationType {
+  MOTORCYCLE_RIDER
+  TAXI_DRIVER
+  DELIVERY_PARTNER
+  VEHICLE_ACCESS
+  MERCHANT
+  FLEET_OWNER
+  VEHICLE_DEALER
+  STRATEGIC_PARTNER
+}
+
+enum ApplicationStatus {
+  RECEIVED
+  UNDER_REVIEW
+  MORE_INFORMATION_REQUIRED
+  PRE_QUALIFIED
+  APPROVED_FOR_NEXT_STAGE
+  WAITLISTED
+  DECLINED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  OPERATIONS_ADMIN
+  RECRUITMENT_AGENT
+  VIEW_ONLY
+}
+
+model Applicant {
+  id              String        @id @default(cuid())
+  firstName       String
+  lastName        String
+  phone           String
+  normalizedPhone String
+  whatsapp        String?
+  email           String?
+  normalizedEmail String?
+  city            String
+  area            String?
+  createdAt       DateTime      @default(now())
+  applications    Application[]
+
+  @@index([normalizedPhone])
+  @@index([normalizedEmail])
+  @@index([city, createdAt])
+}
+
+model Application {
+  id          Int               @id @default(autoincrement())
+  reference   String            @unique
+  applicantId String
+  type        ApplicationType
+  status      ApplicationStatus @default(RECEIVED)
+  data        Json
+  consentAt   DateTime
+  submittedAt DateTime          @default(now())
+  assignedTo  String?
+  applicant   Applicant         @relation(fields: [applicantId], references: [id])
+  history     ApplicationStatusHistory[]
+  notes       ApplicationNote[]
+
+  @@index([type, status, submittedAt])
+  @@index([status, submittedAt])
+  @@index([assignedTo, status])
+}
+
+model ApplicationStatusHistory {
+  id             String            @id @default(cuid())
+  applicationId  Int
+  previousStatus ApplicationStatus?
+  newStatus      ApplicationStatus
+  changedById    String?
+  reason         String?
+  changedAt      DateTime          @default(now())
+  application    Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy      AdminUser?       @relation(fields: [changedById], references: [id])
+
+  @@index([applicationId, changedAt])
+}
+
+model ApplicationNote {
+  id            String      @id @default(cuid())
+  applicationId Int
+  authorId      String
+  body          String
+  followUpAt    DateTime?
+  createdAt     DateTime    @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author        AdminUser   @relation(fields: [authorId], references: [id])
+
+  @@index([applicationId, createdAt])
+}
+
+model AdminUser {
+  id             String                     @id @default(cuid())
+  email          String                     @unique
+  passwordHash   String
+  fullName       String
+  role           AdminRole
+  active         Boolean                    @default(true)
+  createdAt      DateTime                   @default(now())
+  statusChanges  ApplicationStatusHistory[]
+  notes          ApplicationNote[]
+  auditEvents    AdminAuditLog[]
+}
+
+model AdminAuditLog {
+  id        String    @id @default(cuid())
+  actorId   String
+  action    String
+  entityId  String
+  oldState  Json?
+  newState  Json?
+  reason    String?
+  createdAt DateTime  @default(now())
+  actor     AdminUser @relation(fields: [actorId], references: [id])
+
+  @@index([entityId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String?          @unique
+  phone           String           @unique
+  passwordHash    String
+  fullName        String
+  status          UserStatus       @default(PENDING)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  roles           UserRole[]
+  customerProfile CustomerProfile?
+  operatorProfile OperatorProfile?
+  tripsAsCustomer Trip[]           @relation("TripCustomer")
+  auditEvents     AuditLog[]       @relation("AuditActor")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id    String           @id @default(cuid())
+  key   String           @unique
+  roles RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model CustomerProfile {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addresses Address[]
+}
+
+model OperatorProfile {
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  operatorCode   String          @unique
+  status         OperatorStatus  @default(DRAFT)
+  serviceModes   ServiceType[]
+  rating         Decimal?        @db.Decimal(3, 2)
+  city           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trips          Trip[]          @relation("TripOperator")
+  assignments    VehicleAssignment[]
+  documents      Document[]
+  ledgerEntries  LedgerEntry[]
+
+  @@index([status, city])
+}
+
+model Address {
+  id                String          @id @default(cuid())
+  customerProfileId String
+  label             String?
+  addressLine       String
+  city              String
+  latitude          Decimal?        @db.Decimal(10, 7)
+  longitude         Decimal?        @db.Decimal(10, 7)
+  customerProfile   CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+}
+
+model ServiceZone {
+  id        String       @id @default(cuid())
+  name      String
+  city      String
+  enabled   Boolean      @default(false)
+  services  ServiceType[]
+  createdAt DateTime     @default(now())
+
+  @@unique([name, city])
+}
+
+model Vehicle {
+  id              String              @id @default(cuid())
+  assetCode       String              @unique
+  type            VehicleType
+  make            String
+  model           String
+  year            Int?
+  registration    String?             @unique
+  vin             String?             @unique
+  status          VehicleStatus       @default(AVAILABLE)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  assignments     VehicleAssignment[]
+  documents       Document[]
+}
+
+model VehicleAssignment {
+  id                String          @id @default(cuid())
+  vehicleId         String
+  operatorProfileId String
+  assignedAt        DateTime        @default(now())
+  returnedAt        DateTime?
+  reason            String
+  handoverCondition String?
+  odometer          Int?
+  notes             String?
+  vehicle           Vehicle         @relation(fields: [vehicleId], references: [id])
+  operator          OperatorProfile @relation(fields: [operatorProfileId], references: [id])
+
+  @@index([vehicleId, assignedAt])
+  @@index([operatorProfileId, returnedAt])
+}
+
+model ComplianceRequirement {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  name        String
+  requiredFor String[]
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  documents   Document[]
+}
+
+model Document {
+  id                        String                @id @default(cuid())
+  requirementId             String
+  operatorProfileId         String?
+  vehicleId                 String?
+  status                    ComplianceStatus      @default(MISSING)
+  storageKey                String?
+  expiresAt                 DateTime?
+  reviewedAt                DateTime?
+  reviewedBy                String?
+  createdAt                 DateTime              @default(now())
+  requirement               ComplianceRequirement @relation(fields: [requirementId], references: [id])
+  operator                  OperatorProfile?       @relation(fields: [operatorProfileId], references: [id])
+  vehicle                   Vehicle?               @relation(fields: [vehicleId], references: [id])
+
+  @@index([status, expiresAt])
+}
+
+model PricingRule {
+  id                    String      @id @default(cuid())
+  service               ServiceType
+  zoneId                String
+  baseFarePesewas       Int
+  perKmPesewas          Int
+  perMinutePesewas      Int
+  minimumFarePesewas    Int
+  bookingFeePesewas     Int           @default(0)
+  platformFeeBasisPoints Int
+  effectiveFrom         DateTime
+  effectiveTo           DateTime?
+  createdAt             DateTime      @default(now())
+
+  @@index([service, zoneId, effectiveFrom])
+}
+
+model Trip {
+  id                  String       @id @default(cuid())
+  customerId          String
+  operatorProfileId   String?
+  service             ServiceType
+  status              TripStatus   @default(REQUESTED)
+  pickupLabel         String
+  destinationLabel    String
+  estimatedFarePesewas Int
+  finalFarePesewas    Int?
+  requestedAt         DateTime     @default(now())
+  completedAt         DateTime?
+  customer            User         @relation("TripCustomer", fields: [customerId], references: [id])
+  operator            OperatorProfile? @relation("TripOperator", fields: [operatorProfileId], references: [id])
+  ledgerEntries       LedgerEntry[]
+
+  @@index([status, requestedAt])
+  @@index([customerId, requestedAt])
+  @@index([operatorProfileId, requestedAt])
+}
+
+model LedgerEntry {
+  id                String          @id @default(cuid())
+  operatorProfileId String
+  tripId            String?
+  type              LedgerType
+  category          String
+  amountPesewas     Int
+  currency          String          @default("GHS")
+  description       String
+  createdAt         DateTime        @default(now())
+  operator          OperatorProfile @relation(fields: [operatorProfileId], references: [id])
+  trip              Trip?           @relation(fields: [tripId], references: [id])
+
+  @@index([operatorProfileId, createdAt])
+  @@index([tripId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String
+  entity     String
+  entityId   String
+  oldState   Json?
+  newState   Json?
+  reason     String?
+  createdAt  DateTime @default(now())
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([entity, entityId, createdAt])
+  @@index([actorId, createdAt])
+}
