@@ -30,16 +30,15 @@
 .customer-demo { margin: 0 0 14px; }
 .customer-welcome { position: relative; min-height: 190px; overflow: hidden; border-radius: 24px; padding: 27px 32px; display: flex; align-items: center; background: linear-gradient(110deg, #e9f8e9, #bce7d9); }
 .customer-welcome-evening { background: linear-gradient(110deg, #e3f4e4, #c0e0d1); }
-.customer-welcome-copy { position: relative; z-index: 1; pointer-events: none; }
+.customer-welcome-copy { position: relative; z-index: 1; width: 40%; min-width: 0; overflow-wrap: anywhere; pointer-events: none; }
 .heritage-background { position: absolute; inset: 0 0 0 auto; width: 60%; overflow: hidden; mask-image: linear-gradient(to right, transparent, #000 38%); }
 .heritage-layer { position: absolute; inset: 0; background-size: cover; background-position: right center; }
 .heritage-art-label { position: absolute; right: 8px; bottom: 6px; padding: 3px 6px; border-radius: 5px; background: #003c28d9; color: white; font-size: 9px; }
-.heritage-refresh-error { position: absolute; z-index: 2; right: 8px; bottom: 6px; background: #fff; color: #713000; padding: 4px 7px; border-radius: 4px; font-size: 10px; }
 .heritage-fade-in { animation: heritage-crossfade 1.5s ease both; }
 @keyframes heritage-crossfade { from { opacity: 0; } to { opacity: 1; } }
 .customer-welcome p { color: #006838; font-weight: 800; margin: 0 0 10px; }
 .customer-welcome h1 { font-size: clamp(26px, 3vw, 38px); line-height: 1.12; letter-spacing: -1.3px; margin: 0 0 12px; }
-.customer-welcome div > span { color: #4b6b56; }
+.customer-welcome-copy > span { color: #365845; }
 .customer-search { margin: 20px 0 30px; width: 100%; padding: 17px 20px; display: flex; align-items: center; gap: 14px; border: 1px solid #e4ebe4; border-radius: 15px; background: #fff; text-align: left; color: #006838; box-shadow: 0 5px 20px #173a210a; }
 .customer-search span:first-of-type { flex: 1; font-weight: 700; color: #45554a; }
 .customer-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin: 0 0 15px; }
@@ -108,8 +107,10 @@
   .customer-location { max-width: 220px; font-size: 12px; }
   .customer-location svg { width: 16px; height: 16px; }
   .customer-content { padding: 18px 16px 110px; }
-  .customer-welcome { min-height: 170px; padding: 24px; }
-  .heritage-background { width: 58%; opacity: .85; }
+  .customer-welcome { min-height: 170px; padding: 20px; }
+  .customer-welcome-copy { width: 62%; }
+  .customer-welcome h1 { font-size: clamp(1.25rem, 5vw, 1.65rem); letter-spacing: -.04em; }
+  .heritage-background { width: 38%; opacity: .9; mask-image: linear-gradient(to right, transparent, #000 30%); }
   .customer-services { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .customer-service-image { height: clamp(105px, 31vw, 190px); }
   .customer-service-copy { min-height: 137px; padding: 13px 27px 16px 12px; }

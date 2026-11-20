@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { nextRotationTime, rotationIndex, type HeritageArtwork, type HeritageRotation } from "@/config/heritage-rotation";
 
-export function HeritageBackground({ rotation, initialError = false }: { rotation: HeritageRotation; initialError?: boolean }) {
+export function HeritageBackground({ rotation }: { rotation: HeritageRotation }) {
   const [settings, setSettings] = useState(rotation);
-  const [refreshError, setRefreshError] = useState(initialError);
   const [visible, setVisible] = useState<HeritageArtwork | null>(null);
   const [previous, setPrevious] = useState<HeritageArtwork | null>(null);
   const [unavailable, setUnavailable] = useState<string[]>([]);
@@ -25,11 +24,9 @@ export function HeritageBackground({ rotation, initialError = false }: { rotatio
         const updated: HeritageRotation = await response.json();
         if (!active || requestController.signal.aborted) return;
         setSettings((old) => JSON.stringify(old) === JSON.stringify(updated) ? old : updated);
-        setRefreshError(false);
       } catch (error) {
         if (active && !requestController.signal.aborted) {
           console.error("ROVA heritage settings refresh failed", error);
-          setRefreshError(true);
         }
       } finally {
         if (active && controller === requestController && !requestController.signal.aborted && document.visibilityState === "visible") timer = window.setTimeout(refresh, 60000);
@@ -114,6 +111,5 @@ export function HeritageBackground({ rotation, initialError = false }: { rotatio
       {current && <div key={current.id} className="heritage-layer heritage-fade-in" style={{ backgroundImage: `url("${current.image}")` }} />}
       {current && <span className="heritage-art-label" aria-hidden="true">AI artistic interpretation</span>}
     </div>
-    {refreshError && <span className="heritage-refresh-error" role="status">Banner settings could not be refreshed.</span>}
   </>;
 }

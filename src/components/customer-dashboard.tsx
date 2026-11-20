@@ -54,7 +54,7 @@ function Icon({ name }: { name: string }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name] ?? paths.pin} /></svg>;
 }
 
-export function CustomerDashboard({ user, rotation, heritageError = false }: { user: { name: string }; rotation: HeritageRotation; heritageError?: boolean }) {
+export function CustomerDashboard({ user, rotation }: { user: { name: string }; rotation: HeritageRotation }) {
   const router = useRouter();
   const [section, setSection] = useState<Section>("Home");
   const [locationOpen, setLocationOpen] = useState(false);
@@ -190,7 +190,7 @@ export function CustomerDashboard({ user, rotation, heritageError = false }: { u
         {message && <p className="customer-message" role="status">{message} <button onClick={() => setMessage("")} aria-label="Dismiss message">×</button></p>}
         {section === "Home" && <>
           <section className={`customer-welcome ${hour >= 18 || hour < 5 ? "customer-welcome-evening" : ""}`}>
-            <HeritageBackground rotation={rotation} initialError={heritageError} />
+            <HeritageBackground rotation={rotation} />
             <div className="customer-welcome-copy"><p>{greeting(hour)}, {user.name.trim().split(/\s+/)[0]}!</p><h1>What would you like<br />to do today?</h1><span>Wherever life takes you, ROVA is with you.</span></div>
           </section>
           <button className="customer-search" onClick={() => openBooking("RIDE")}><Icon name="search" /><span>Where to?</span><span aria-hidden="true">→</span></button>
