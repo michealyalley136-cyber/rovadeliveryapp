@@ -9,6 +9,7 @@ import { ghanaRegions, localDateAndHour, type GhanaRegion } from "@/config/herit
 import type { HeritageRotation } from "@/config/heritage-rotation";
 import { HeritageBackground } from "@/components/heritage-background";
 import type { Trip } from "@/lib/domain";
+import { startVisiblePolling } from "@/lib/visible-polling";
 
 type Section = "Home" | "Activity" | "Wallet" | "Safety" | "Account";
 type RideService = "RIDE" | "TAXI";
@@ -73,21 +74,21 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
   const hour = Number(hourText);
 
   useEffect(() => {
-    let active = true;
-    async function load() {
-      try {
-        const response = await fetch("/api/dashboard", { cache: "no-store" });
-        if (response.status === 401) { if (active) router.refresh(); return; }
+    return startVisiblePolling({
+      interval: 5000,
+      maxInterval: 120000,
+      immediate: true,
+      async run(signal) {
+        const response = await fetch("/api/dashboard", { cache: "no-store", signal });
+        if (response.status === 401) { if (!signal.aborted) router.refresh(); throw new Error("Customer session expired."); }
         const result = await response.json();
         if (!response.ok) throw new Error(result.error ?? "Could not load demo activity.");
-        if (active) { setTrips(result.trips); setDashboardError(""); }
-      } catch (reason) {
-        if (active) setDashboardError(reason instanceof Error ? reason.message : "Could not load demo activity.");
-      }
-    }
-    void load();
-    const timer = window.setInterval(() => void load(), 5000);
-    return () => { active = false; window.clearInterval(timer); };
+        if (!signal.aborted) { setTrips(result.trips); setDashboardError(""); }
+      },
+      onError(reason) {
+        setDashboardError(reason instanceof Error ? reason.message : "Could not load demo activity.");
+      },
+    });
   }, [router]);
 
   function useLocation() {

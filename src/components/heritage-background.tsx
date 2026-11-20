@@ -2,48 +2,42 @@
 
 import { useEffect, useRef, useState } from "react";
 import { nextRotationTime, rotationIndex, type HeritageArtwork, type HeritageRotation } from "@/config/heritage-rotation";
+import { startVisiblePolling } from "@/lib/visible-polling";
 
 export function HeritageBackground({ rotation }: { rotation: HeritageRotation }) {
   const [settings, setSettings] = useState(rotation);
   const [visible, setVisible] = useState<HeritageArtwork | null>(null);
   const [previous, setPrevious] = useState<HeritageArtwork | null>(null);
-  const [unavailable, setUnavailable] = useState<string[]>([]);
+  const [unavailable, setUnavailable] = useState<Record<string, number>>({});
   const visibleRef = useRef<HeritageArtwork | null>(null);
 
   useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    let controller: AbortController | undefined;
-    async function refresh() {
-      if (!active || document.visibilityState !== "visible") return;
-      const requestController = new AbortController();
-      controller = requestController;
-      try {
-        const response = await fetch("/api/customer/heritage", { cache: "no-store", signal: requestController.signal });
+    return startVisiblePolling({
+      interval: 60000,
+      maxInterval: 300000,
+      async run(signal) {
+        const response = await fetch("/api/customer/heritage", { cache: "no-store", signal });
         if (!response.ok) throw new Error(`Heritage settings request failed (${response.status}).`);
-        const updated: HeritageRotation = await response.json();
-        if (!active || requestController.signal.aborted) return;
+        const updated: unknown = await response.json();
+        if (!isRotation(updated)) throw new Error("Heritage settings response is invalid.");
+        if (signal.aborted) return;
         setSettings((old) => JSON.stringify(old) === JSON.stringify(updated) ? old : updated);
-      } catch (error) {
-        if (active && !requestController.signal.aborted) {
-          console.error("ROVA heritage settings refresh failed", error);
-        }
-      } finally {
-        if (active && controller === requestController && !requestController.signal.aborted && document.visibilityState === "visible") timer = window.setTimeout(refresh, 60000);
-      }
-    }
-    function onVisibility() {
-      window.clearTimeout(timer);
-      controller?.abort();
-      if (document.visibilityState === "visible") void refresh();
-    }
-    timer = window.setTimeout(refresh, 60000);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => { active = false; window.clearTimeout(timer); controller?.abort(); document.removeEventListener("visibilitychange", onVisibility); };
+      },
+      onError(error) { console.error("ROVA heritage settings refresh failed", error); },
+    });
   }, []);
 
   useEffect(() => {
-    const available = settings.artworks.filter((art) => !unavailable.includes(art.id));
+    const expiries = Object.values(unavailable);
+    if (!expiries.length) return;
+    const delay = Math.max(0, Math.min(...expiries) - Date.now());
+    const timer = window.setTimeout(() => setUnavailable((old) =>
+      Object.fromEntries(Object.entries(old).filter(([, expires]) => expires > Date.now()))), delay);
+    return () => window.clearTimeout(timer);
+  }, [unavailable]);
+
+  useEffect(() => {
+    const available = settings.artworks.filter((art) => !(art.id in unavailable));
     if (!available.length) return;
     let active = true;
     let timer: number | undefined;
@@ -70,12 +64,7 @@ export function HeritageBackground({ rotation }: { rotation: HeritageRotation })
       loading.onerror = () => {
         if (active) {
           console.error("ROVA heritage image failed to load", current.id);
-          if (visibleRef.current?.id === current.id || unavailable.length + 1 >= settings.artworks.length) {
-            visibleRef.current = null;
-            setVisible(null);
-            setPrevious(null);
-          }
-          setUnavailable((old) => [...old, current.id]);
+          setUnavailable((old) => ({ ...old, [current.id]: Date.now() + 60000 }));
         }
       };
       loading.src = current.image;
@@ -84,7 +73,7 @@ export function HeritageBackground({ rotation }: { rotation: HeritageRotation })
       timer = window.setTimeout(schedule, delay + 10);
     }
 
-    schedule();
+    if (document.visibilityState === "visible") schedule();
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
         window.clearTimeout(timer); window.clearTimeout(preloadTimer); window.clearTimeout(fadeTimer);
@@ -103,7 +92,7 @@ export function HeritageBackground({ rotation }: { rotation: HeritageRotation })
     };
   }, [settings, unavailable]);
 
-  const isAllowed = (art: HeritageArtwork | null) => art && settings.artworks.some((item) => item.id === art.id) && !unavailable.includes(art.id);
+  const isAllowed = (art: HeritageArtwork | null) => art && settings.artworks.some((item) => item.id === art.id);
   const current = isAllowed(visible) ? visible : null;
   return <>
     <div className="heritage-background" aria-label={current ? `AI-generated artistic interpretation: ${current.name}` : undefined} role={current ? "img" : undefined}>
@@ -112,4 +101,12 @@ export function HeritageBackground({ rotation }: { rotation: HeritageRotation })
       {current && <span className="heritage-art-label" aria-hidden="true">AI artistic interpretation</span>}
     </div>
   </>;
+}
+
+function isRotation(value: unknown): value is HeritageRotation {
+  if (!value || typeof value !== "object" || !("intervalSeconds" in value) || !("artworks" in value)) return false;
+  return typeof value.intervalSeconds === "number" && Number.isInteger(value.intervalSeconds) && value.intervalSeconds > 0 &&
+    Array.isArray(value.artworks) && value.artworks.every((art: unknown) =>
+      !!art && typeof art === "object" && "id" in art && typeof art.id === "string" &&
+      "name" in art && typeof art.name === "string" && "image" in art && typeof art.image === "string" && art.image.startsWith("/heritage/"));
 }
