@@ -6,6 +6,14 @@ datasource db {
   provider = "postgresql"
 }
 
+model HeritageSettings {
+  id              String   @id
+  intervalMinutes Int      @default(180)
+  intervalSeconds Int?
+  disabledIds     String[] @default([])
+  updatedAt       DateTime @updatedAt
+}
+
 enum UserStatus {
   ACTIVE
   PENDING
@@ -211,7 +219,91 @@ model User {
   customerProfile CustomerProfile?
   operatorProfile OperatorProfile?
   tripsAsCustomer Trip[]           @relation("TripCustomer")
+  simulatedRides  SimulatedRide[]
   auditEvents     AuditLog[]       @relation("AuditActor")
+}
+
+enum SimulatedRideStatus {
+  REQUESTED
+  SEARCHING
+  DRIVER_ASSIGNED
+  DRIVER_EN_ROUTE
+  DRIVER_ARRIVED
+  PICKUP_VERIFIED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_DRIVERS_AVAILABLE
+  EXPIRED
+}
+
+enum SimulatedOfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  WITHDRAWN
+}
+
+model SimulatedRide {
+  id                   String              @id @default(cuid())
+  customerId           String
+  idempotencyKey       String
+  requestFingerprint   String
+  service              ServiceType
+  status               SimulatedRideStatus @default(REQUESTED)
+  pickupLabel          String
+  pickupLatitude       Decimal             @db.Decimal(10, 7)
+  pickupLongitude      Decimal             @db.Decimal(10, 7)
+  destinationLabel     String
+  destinationLatitude  Decimal             @db.Decimal(10, 7)
+  destinationLongitude Decimal             @db.Decimal(10, 7)
+  searchStartedAt      DateTime?
+  searchExpiresAt      DateTime?
+  searchStages         Json
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  customer             User                @relation(fields: [customerId], references: [id])
+  assignment           SimulatedAssignment?
+  offers               SimulatedOffer[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([status, searchExpiresAt])
+}
+
+model SimulatedDriver {
+  id          String               @id @default(cuid())
+  name        String
+  service     ServiceType
+  available   Boolean              @default(false)
+  assignments SimulatedAssignment[]
+  offers      SimulatedOffer[]
+}
+
+model SimulatedAssignment {
+  id          String          @id @default(cuid())
+  rideId      String          @unique
+  driverId    String
+  assignedAt  DateTime        @default(now())
+  releasedAt  DateTime?
+  ride        SimulatedRide   @relation(fields: [rideId], references: [id])
+  driver      SimulatedDriver @relation(fields: [driverId], references: [id])
+
+  @@index([driverId, releasedAt])
+}
+
+model SimulatedOffer {
+  id        String               @id @default(cuid())
+  rideId    String
+  driverId  String
+  status    SimulatedOfferStatus @default(PENDING)
+  createdAt DateTime             @default(now())
+  expiresAt DateTime
+  ride      SimulatedRide        @relation(fields: [rideId], references: [id])
+  driver    SimulatedDriver      @relation(fields: [driverId], references: [id])
+
+  @@unique([rideId, driverId])
+  @@index([status, expiresAt])
 }
 
 model Role {

@@ -4,6 +4,8 @@ out
 build
 coverage
 .env*
+.env.staging
 !.env.example
+!.env.staging.example
 *.tsbuildinfo
 prisma/*.db
