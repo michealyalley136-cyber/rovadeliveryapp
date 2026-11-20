@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { applicationTypeOptions, ghanaCities, type ApplicationStatus, type ApplicationType } from "@/config/application-types";
 
 type AdminUser = { name: string; role: string };
@@ -59,6 +59,7 @@ export function AdminPortal({ user }: { user: AdminUser | null }) {
   const [followUpAt, setFollowUpAt] = useState("");
   const [saved, setSaved] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
+  const detailRequest = useRef(0);
 
   async function signIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,17 +105,27 @@ export function AdminPortal({ user }: { user: AdminUser | null }) {
     };
   }, [city, page, reloadToken, search, status, type, user]);
 
-  async function openApplication(id: number) {
+  async function openApplication(id: number, preserveConfirmation = false, preserveReview = false) {
+    if (!preserveConfirmation && (loading || selected?.id === id)) return;
+    if (!preserveConfirmation && selected && selected.id !== id && (reason.trim() || note.trim() || followUpAt) &&
+      !window.confirm("Discard the unsaved review for this applicant?")) return;
+    const requestId = ++detailRequest.current;
     setError("");
-    setSaved("");
+    if (!preserveConfirmation) setSaved("");
     try {
       const response = await fetch(`/api/admin/applications/${id}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Could not load application.");
+      if (requestId !== detailRequest.current) return;
       setSelected(result.application);
-      setNextStatus(result.application.status === "RECEIVED" ? "UNDER_REVIEW" : result.application.status);
+      if (!preserveReview) setNextStatus(result.application.status === "RECEIVED" ? "UNDER_REVIEW" : result.application.status);
+      if (!preserveConfirmation) {
+        setReason("");
+        setNote("");
+        setFollowUpAt("");
+      }
     } catch (issue) {
-      setError(issue instanceof Error ? issue.message : "Could not load application.");
+      if (requestId === detailRequest.current) setError(issue instanceof Error ? issue.message : "Could not load application.");
     }
   }
 
@@ -146,11 +157,11 @@ export function AdminPortal({ user }: { user: AdminUser | null }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Could not save this review.");
-      setSaved("Review saved to the application history.");
       setNote("");
       setReason("");
       setFollowUpAt("");
-      await openApplication(selected.id);
+      await openApplication(selected.id, true);
+      setSaved("Review saved to the application history.");
       setReloadToken((current) => current + 1);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Could not save this review.");
@@ -172,8 +183,8 @@ export function AdminPortal({ user }: { user: AdminUser | null }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Could not assign this application.");
+      await openApplication(selected.id, true, true);
       setSaved("Application assigned to you.");
-      await openApplication(selected.id);
       setReloadToken((current) => current + 1);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : "Could not assign this application.");
