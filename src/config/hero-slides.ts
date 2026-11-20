@@ -1,18 +1,38 @@
-import type { StaticImageData } from "next/image";
-import brandIntro from "@/images/Move. Deliver. Earn. With ROVA-1.png";
-import brandNetwork from "@/images/Move, Deliver, Earn with ROVA Ghana-2.png";
-import safeRides from "@/images/ROVA Ghana_ Safe, Reliable Rides-3.png";
-import newOpportunities from "@/images/ROVA Ghana_ Safe Rides, New Opportunities-4.png";
-import deliveryPartners from "@/images/ROVA Ghana_ Deliver More, Earn More-5.png";
-import deliveryCommerce from "@/images/Deliver More, Grow with ROVA-6.png";
-import serviceNetwork from "@/images/ROVA Ghana_ One Platform, Many Opportunities-7.png";
-import vehicleAccess from "@/images/Your Journey to Earning Starts Here-8.png";
-import applicationsOpen from "@/images/ROVA Ghana_ Your Next Opportunity-9.png";
-import ghardwareMarketplace from "@/images/GHARDWARE-Ghana-Marketplace-Banner-10.png";
+import brandIntro from "../images/Move. Deliver. Earn. With ROVA-1.png";
+import brandNetwork from "../images/Move-Deliver-Earn-with-ROVA-Ghana-2.png";
+import safeRides from "../images/ROVA-Ghana-Safe-Reliable-Rides-3.png";
+import newOpportunities from "../images/ROVA-Ghana-Safe-Rides-New-Opportunities-4.png";
+import deliveryPartners from "../images/ROVA-Ghana-Deliver-More-Earn-More-5.png";
+import deliveryCommerce from "../images/Deliver-More-Grow-with-ROVA-6.png";
+import serviceNetwork from "../images/ROVA-Ghana-One-Platform-Many-Opportunities-7.png";
+import vehicleAccess from "../images/Your Journey to Earning Starts Here-8.png";
+import applicationsOpen from "../images/ROVA Ghana_ Your Next Opportunity-9.png";
+import ghardwareMarketplace from "../images/GHARDWARE-Ghana-Marketplace-Banner-10.png";
+
+export function getEnabledSlides(slides: readonly HeroSlide[] = heroSlides): HeroSlide[] {
+  return slides.filter((slide) => slide.enabled);
+}
+
+export function getNextSlideIndex(current: number, total: number): number {
+  if (total < 2) return 0;
+  return (current + 1) % total;
+}
+
+export function getPreviousSlideIndex(current: number, total: number): number {
+  if (total < 2) return 0;
+  return (current - 1 + total) % total;
+}
+
+export type SlideImageAsset = {
+  src: string;
+  width: number;
+  height: number;
+  blurDataURL?: string;
+};
 
 export type HeroSlide = {
   id: string;
-  image: StaticImageData;
+  image: SlideImageAsset;
   alt: string;
   desktopPosition: string;
   mobilePosition: string;

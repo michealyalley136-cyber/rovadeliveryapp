@@ -1,42 +1,38 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
-import Image from "next/image";
 import Link from "next/link";
-import type { CSSProperties, TouchEvent } from "react";
+import type { TouchEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { heroSlides } from "@/config/hero-slides";
+import { getEnabledSlides, getNextSlideIndex, getPreviousSlideIndex, heroSlides } from "@/config/hero-slides";
 
-const enabledSlides = heroSlides.filter((slide) => slide.enabled);
+const enabledSlides = getEnabledSlides(heroSlides);
 
 export function HeroSlideshow() {
   const [active, setActive] = useState(0);
-  const [previous, setPrevious] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const activeRef = useRef(0);
-  const transitionTimeout = useRef<number | null>(null);
+
   const slide = enabledSlides[active];
 
-  const showSlide = useCallback((next: number) => {
-    if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
-    setPrevious(activeRef.current);
-    activeRef.current = next;
-    setActive(next);
-    transitionTimeout.current = window.setTimeout(() => setPrevious(null), 1200);
+  const goNext = useCallback(() => {
+    setActive((current) => getNextSlideIndex(current, enabledSlides.length));
   }, []);
 
-  const move = useCallback((direction: number) => {
-    showSlide((activeRef.current + direction + enabledSlides.length) % enabledSlides.length);
-  }, [showSlide]);
+  const goPrevious = useCallback(() => {
+    setActive((current) => getPreviousSlideIndex(current, enabledSlides.length));
+  }, []);
 
   useEffect(() => {
     if (paused || reducedMotion || enabledSlides.length < 2) return;
-    const timer = window.setTimeout(() => move(1), slide.duration);
+    const timer = window.setTimeout(() => {
+      setActive((current) => getNextSlideIndex(current, enabledSlides.length));
+    }, slide?.duration ?? 6000);
     return () => window.clearTimeout(timer);
-  }, [active, move, paused, reducedMotion, slide.duration]);
+  }, [active, paused, reducedMotion, slide?.duration]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -47,8 +43,8 @@ export function HeroSlideshow() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMenuOpen(false);
       if (event.target instanceof HTMLElement && event.target.closest("a, button, input, textarea, select, summary")) return;
-      if (event.key === "ArrowRight") move(1);
-      if (event.key === "ArrowLeft") move(-1);
+      if (event.key === "ArrowRight") goNext();
+      if (event.key === "ArrowLeft") goPrevious();
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("keydown", onKey);
@@ -56,9 +52,8 @@ export function HeroSlideshow() {
       media.removeEventListener("change", updateMotionPreference);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("keydown", onKey);
-      if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
     };
-  }, [move]);
+  }, [goNext, goPrevious]);
 
   function onTouchEnd(event: TouchEvent<HTMLElement>) {
     const start = touchStart.current;
@@ -66,7 +61,10 @@ export function HeroSlideshow() {
     if (!start || !end) return;
     const horizontal = start.x - end.clientX;
     const vertical = start.y - end.clientY;
-    if (Math.abs(horizontal) > 55 && Math.abs(horizontal) > Math.abs(vertical) * 1.25) move(horizontal > 0 ? 1 : -1);
+    if (Math.abs(horizontal) > 55 && Math.abs(horizontal) > Math.abs(vertical) * 1.25) {
+      if (horizontal > 0) goNext();
+      else goPrevious();
+    }
     touchStart.current = null;
   }
 
@@ -81,16 +79,29 @@ export function HeroSlideshow() {
       onTouchEnd={onTouchEnd}
     >
       <div className="campaign-backdrop" />
-      {enabledSlides.map((item, index) => {
-        if (index !== active && index !== previous) return null;
-        const imageStyle = { "--desktop-position": item.desktopPosition, "--mobile-position": item.mobilePosition } as CSSProperties;
-        return (
-          <div className={`campaign-slide ${index === active ? "is-active" : "is-leaving"}`} key={item.id} aria-hidden={index !== active} style={imageStyle}>
-            <Image src={item.image} alt="" fill sizes="100vw" quality={42} className="campaign-backdrop-image" aria-hidden="true" />
-            <Image src={item.image} alt={item.alt} fill sizes="100vw" quality={82} preload={index === 0} className="campaign-image" style={{ objectPosition: "var(--desktop-position)" }} />
+      {enabledSlides.map((item, index) => (
+        <div
+          key={item.id}
+          className={`campaign-slide ${index === active ? "is-active" : ""}`}
+          aria-hidden={index !== active}
+        >
+          <img
+            src={item.image.src}
+            alt=""
+            aria-hidden="true"
+            className="campaign-backdrop-image"
+            draggable={false}
+          />
+          <div className="campaign-poster-frame">
+            <img
+              src={item.image.src}
+              alt={item.alt}
+              className="campaign-image"
+              draggable={false}
+            />
           </div>
-        );
-      })}
+        </div>
+      ))}
       <div className="campaign-overlay" />
       <header className={`campaign-nav ${scrolled ? "nav-scrolled" : ""}`}>
         <Link className="campaign-logo" href="/" aria-label="ROVA Ghana home">ROVA<span>.</span></Link>
@@ -103,14 +114,39 @@ export function HeroSlideshow() {
         </nav>
         <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span /><span /></button>
       </header>
-      <h1 className="visually-hidden" aria-live="polite">{slide.headline}</h1>
-      <div className="campaign-utility"><span><i /> ROVA GHANA · PRE-LAUNCH</span><Link href={slide.ctaHref}>{slide.ctaLabel} <b>↗</b></Link></div>
-      <div className="slide-controls" aria-label="Campaign slideshow controls">
-        <button className="slide-arrow" onClick={() => move(-1)} aria-label="Previous slide">←</button>
-        <div className="slide-progress">
-          {enabledSlides.map((item, index) => <button key={item.id} className={`progress-track ${index === active ? "current" : index < active ? "past" : ""}`} aria-label={`Show campaign slide ${index + 1}`} aria-current={index === active ? "true" : undefined} onClick={() => showSlide(index)}><span style={{ animationDuration: `${item.duration}ms`, animationPlayState: index === active && !paused && !reducedMotion ? "running" : "paused" }} /></button>)}
+      {slide && <h1 className="visually-hidden" aria-live="polite">{slide.headline}</h1>}
+      {slide && (
+        <div className="campaign-utility">
+          <span><i /> ROVA GHANA · PRE-LAUNCH</span>
+          {process.env.NODE_ENV !== "production" && (
+            <span className="slide-debug" aria-hidden="true">
+              {active + 1} / {enabledSlides.length} — {slide.id}
+            </span>
+          )}
+          <Link href={slide.ctaHref}>{slide.ctaLabel} <b>↗</b></Link>
         </div>
-        <button className="slide-arrow" onClick={() => move(1)} aria-label="Next slide">→</button>
+      )}
+      <div className="slide-controls" aria-label="Campaign slideshow controls">
+        <button className="slide-arrow" onClick={goPrevious} aria-label="Previous slide">←</button>
+        <div className="slide-progress">
+          {enabledSlides.map((item, index) => (
+            <button
+              key={item.id}
+              className={`progress-track ${index === active ? "current" : index < active ? "past" : ""}`}
+              aria-label={`Show slide ${index + 1}`}
+              aria-current={index === active ? "true" : undefined}
+              onClick={() => setActive(index)}
+            >
+              <span
+                style={{
+                  animationDuration: `${item.duration}ms`,
+                  animationPlayState: index === active && !paused && !reducedMotion ? "running" : "paused",
+                }}
+              />
+            </button>
+          ))}
+        </div>
+        <button className="slide-arrow" onClick={goNext} aria-label="Next slide">→</button>
         <button className="slide-pause" onClick={() => setPaused((value) => !value)} aria-label={paused ? "Play slideshow" : "Pause slideshow"}>{paused ? "▶" : "Ⅱ"}</button>
       </div>
       <a className="hero-scroll" href="#about"><span /> SCROLL TO EXPLORE</a>
