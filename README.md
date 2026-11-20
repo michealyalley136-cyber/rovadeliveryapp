@@ -4,7 +4,7 @@ ROVA is building a Ghana-focused mobility and earning ecosystem connecting passe
 
 The public campaign slideshow uses the original artwork under `src/images/`. The assets are statically imported and are not copied into `public/`.
 
-The approved app artwork and browser icons are served from `public/icons/` and described by `public/manifest.webmanifest`. Supported browsers can offer installation; on iOS, use Safari's Share menu and choose Add to Home Screen. Installation does not provide offline support.
+The approved app artwork and browser icons are served from `public/icons/` and described by `public/manifest.webmanifest`. Use Install ROVA or the browser's install menu; on iOS, use Safari's Share menu and choose Add to Home Screen. Installation availability varies by browser, and installation does not provide offline support.
 
 ## Run locally
 
