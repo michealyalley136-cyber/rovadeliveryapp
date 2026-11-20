@@ -29,14 +29,14 @@ export type ApplicationField = {
 };
 
 export const applicationTypeOptions: { type: ApplicationType; label: string; description: string; prefix: string }[] = [
-  { type: "MOTORCYCLE_RIDER", label: "Motorcycle Rider", description: "Passenger rides and future delivery work.", prefix: "RID" },
-  { type: "TAXI_DRIVER", label: "Taxi Driver", description: "Car-based passenger transportation.", prefix: "DRV" },
-  { type: "DELIVERY_PARTNER", label: "Delivery Partner", description: "Food, package and local delivery.", prefix: "DEL" },
-  { type: "VEHICLE_ACCESS", label: "Vehicle Access", description: "Explore a vehicle for future work.", prefix: "VEH" },
-  { type: "MERCHANT", label: "Restaurant / Merchant", description: "Local food and retail businesses.", prefix: "MER" },
-  { type: "FLEET_OWNER", label: "Fleet Owner", description: "Place vehicles with a future network.", prefix: "FLT" },
-  { type: "VEHICLE_DEALER", label: "Vehicle Dealer", description: "Discuss a dealer or supplier partnership.", prefix: "DLR" },
-  { type: "STRATEGIC_PARTNER", label: "Business / Strategic Partner", description: "Finance, insurance, technology and more.", prefix: "PAR" },
+  { type: "MOTORCYCLE_RIDER", label: "Motorcycle Rider", description: "Provide passenger rides through the future ROVA network.", prefix: "RID" },
+  { type: "TAXI_DRIVER", label: "Taxi Driver", description: "Explore driving opportunities with the future ROVA network.", prefix: "DRV" },
+  { type: "DELIVERY_PARTNER", label: "Delivery Partner", description: "Help people and businesses move food and packages.", prefix: "DEL" },
+  { type: "VEHICLE_ACCESS", label: "Vehicle Access Applicant", description: "Explore access to a vehicle for future work.", prefix: "VEH" },
+  { type: "MERCHANT", label: "Merchant / Restaurant", description: "Connect your food or retail business with ROVA.", prefix: "MER" },
+  { type: "FLEET_OWNER", label: "Fleet Owner", description: "Explore placing vehicles with the future network.", prefix: "FLT" },
+  { type: "VEHICLE_DEALER", label: "Vehicle Dealer", description: "Discuss a dealer or vehicle supply partnership.", prefix: "DLR" },
+  { type: "STRATEGIC_PARTNER", label: "Strategic / Business Partner", description: "Partner with ROVA in finance, insurance, technology or more.", prefix: "PAR" },
 ];
 
 export const ghanaCities = [
@@ -75,7 +75,7 @@ export const applicationFields: Record<ApplicationType, ApplicationField[]> = {
     { name: "availability", label: "Availability", kind: "select", required: true, options: ["Full-time", "Part-time", "Weekends", "Flexible"] },
   ],
   DELIVERY_PARTNER: [
-    { name: "transportType", label: "How would you make deliveries?", kind: "select", required: true, options: ["Motorcycle", "Car", "Bicycle (future option)"] },
+    { name: "transportType", label: "How would you make deliveries?", kind: "select", required: true, options: ["Motorcycle", "Car", "Bicycle (future option)", "Other"] },
     { name: "vehicleAccess", label: "Do you need vehicle access?", kind: "select", required: true, options: ["No, I have a vehicle", "Yes, I would like to explore options"] },
     { name: "experienceYears", label: "Delivery experience", kind: "select", required: true, options: ["No experience yet", "Less than 1 year", "1–3 years", "4+ years"] },
     { name: "availability", label: "Availability", kind: "select", required: true, options: ["Full-time", "Part-time", "Weekends", "Flexible"] },
@@ -91,7 +91,7 @@ export const applicationFields: Record<ApplicationType, ApplicationField[]> = {
   ],
   MERCHANT: [
     { name: "businessName", label: "Business name", kind: "text", required: true },
-    { name: "businessCategory", label: "Business category", kind: "select", required: true, options: ["Restaurant", "Food vendor", "Bakery", "Cafe", "Other"] },
+    { name: "businessCategory", label: "Business category", kind: "select", required: true, options: ["Restaurant", "Food vendor", "Bakery", "Cafe", "Grocery", "Retail", "Other"] },
     { name: "businessAddress", label: "Business address / neighbourhood", kind: "text", required: true },
     { name: "numberOfLocations", label: "Number of locations", kind: "select", required: true, options: ["1", "2–3", "4–10", "11+"] },
     { name: "deliveryService", label: "Do you currently offer delivery?", kind: "select", required: true, options: ["Yes", "No"] },
@@ -103,7 +103,7 @@ export const applicationFields: Record<ApplicationType, ApplicationField[]> = {
     { name: "vehicleTypes", label: "Vehicle types available", kind: "select", required: true, options: ["Motorcycles", "Cars", "Motorcycles and cars"] },
     { name: "vehicleCount", label: "Number of vehicles", kind: "select", required: true, options: ["1", "2–5", "6–20", "21+"] },
     { name: "vehiclesFinanced", label: "Are any vehicles currently financed?", kind: "select", required: true, options: ["Yes", "No", "Some of them"] },
-    { name: "partnershipInterest", label: "Partnership interest", kind: "select", required: true, options: ["Fleet leasing", "Rental", "Driver placement", "Other"] },
+    { name: "partnershipInterest", label: "Partnership interest", kind: "select", required: true, options: ["Fleet leasing", "Rental", "Driver placement", "Finance vehicles", "Manage drivers", "Corporate delivery", "Other"] },
   ],
   VEHICLE_DEALER: [
     { name: "organization", label: "Dealership / supplier name", kind: "text", required: true },
@@ -114,12 +114,53 @@ export const applicationFields: Record<ApplicationType, ApplicationField[]> = {
   ],
   STRATEGIC_PARTNER: [
     { name: "organization", label: "Organization", kind: "text", required: true },
-    { name: "partnerCategory", label: "Partner category", kind: "select", required: true, options: ["Bank", "Finance institution", "Motorcycle supplier", "Car dealer", "Insurance provider", "Maintenance provider", "Restaurant group", "Phone / telecom", "Fleet company", "Corporate organization", "Other"] },
+    { name: "partnerCategory", label: "Partner category", kind: "select", required: true, options: ["Bank", "Finance institution", "Motorcycle supplier", "Car dealer", "Insurance provider", "Maintenance provider", "Restaurant group", "Phone / telecom", "Fleet company", "Corporate organization", "Corporate merchant", "Technology provider", "Government / institutional", "Other"] },
     { name: "position", label: "Your position", kind: "text", required: true },
     { name: "website", label: "Organization website (optional)", kind: "text" },
     { name: "partnershipInterest", label: "How would you like to partner?", kind: "textarea", required: true },
   ],
 };
+
+const additionalFields: Record<ApplicationType, ApplicationField[]> = {
+  MOTORCYCLE_RIDER: [],
+  TAXI_DRIVER: [
+    { name: "vehicleAccessInterest", label: "Interested in future vehicle-access opportunities?", kind: "select", options: ["Yes", "No", "I need more information"] },
+  ],
+  DELIVERY_PARTNER: [
+    { name: "otherTransport", label: "Other transport available (optional)", kind: "text" },
+  ],
+  VEHICLE_ACCESS: [
+    { name: "employmentSituation", label: "Current employment or income situation (optional)", kind: "text" },
+    { name: "availability", label: "Expected working schedule", kind: "select", options: ["Full-time", "Part-time", "Weekends", "Flexible"] },
+  ],
+  MERCHANT: [
+    { name: "products", label: "What do you sell? (optional)", kind: "text" },
+    { name: "dailyOrders", label: "Estimated daily order volume (optional)", kind: "text" },
+    { name: "rovaDeliveryInterest", label: "Interested in ROVA delivery?", kind: "select", options: ["Yes", "No", "I need more information"] },
+  ],
+  FLEET_OWNER: [
+    { name: "companyName", label: "Company name (optional)", kind: "text" },
+    { name: "otherVehicles", label: "Other vehicle types (optional)", kind: "text" },
+  ],
+  VEHICLE_DEALER: [
+    { name: "commercialVehicles", label: "Commercial vehicles available?", kind: "select", options: ["Yes", "No"] },
+    { name: "vehicleCondition", label: "Vehicle condition", kind: "select", options: ["New", "Used", "Both"] },
+    { name: "financingPrograms", label: "Financing or rental programs (optional)", kind: "text" },
+    { name: "operatingRegions", label: "Operating regions (optional)", kind: "text" },
+  ],
+  STRATEGIC_PARTNER: [],
+};
+
+const regionField: ApplicationField = {
+  name: "region",
+  label: "Region",
+  kind: "select",
+  options: ["Ahafo", "Ashanti", "Bono", "Bono East", "Central", "Eastern", "Greater Accra", "North East", "Northern", "Oti", "Savannah", "Upper East", "Upper West", "Volta", "Western", "Western North"],
+};
+
+for (const type of applicationTypes) {
+  applicationFields[type].push(regionField, ...additionalFields[type]);
+}
 
 export function isApplicationType(value: string | null | undefined): value is ApplicationType {
   return applicationTypes.includes(value as ApplicationType);
