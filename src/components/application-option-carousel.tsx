@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState } from "react";
+import user from "@/images/application-options/user.png";
 import motorcycleRider from "@/images/application-options/motorcycle-rider.png";
 import taxiDriver from "@/images/application-options/taxi-driver.png";
 import vehicleAccess from "@/images/application-options/vehicle-access-applicant.png";
@@ -12,6 +13,7 @@ import vehicleDealer from "@/images/application-options/vehicle-dealer.png";
 import type { ApplicationType } from "@/config/application-types";
 
 export const visualOptions = [
+  { id: "user", label: "User", type: "CUSTOMER", image: user },
   { id: "motorcycle-rider", label: "Motorcycle Rider", type: "MOTORCYCLE_RIDER", image: motorcycleRider },
   { id: "taxi-driver", label: "Taxi Driver", type: "TAXI_DRIVER", image: taxiDriver },
   { id: "vehicle-access", label: "Vehicle Access Applicant", type: "VEHICLE_ACCESS", image: vehicleAccess },

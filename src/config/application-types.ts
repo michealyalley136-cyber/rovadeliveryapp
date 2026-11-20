@@ -1,4 +1,5 @@
 export const applicationTypes = [
+  "CUSTOMER",
   "MOTORCYCLE_RIDER",
   "TAXI_DRIVER",
   "DELIVERY_PARTNER",
@@ -29,6 +30,7 @@ export type ApplicationField = {
 };
 
 export const applicationTypeOptions: { type: ApplicationType; label: string; description: string; prefix: string }[] = [
+  { type: "CUSTOMER", label: "User", description: "Register your interest in using ROVA services.", prefix: "USR" },
   { type: "MOTORCYCLE_RIDER", label: "Motorcycle Rider", description: "Provide passenger rides through the future ROVA network.", prefix: "RID" },
   { type: "TAXI_DRIVER", label: "Taxi Driver", description: "Explore driving opportunities with the future ROVA network.", prefix: "DRV" },
   { type: "DELIVERY_PARTNER", label: "Delivery Partner", description: "Help people and businesses move food and packages.", prefix: "DEL" },
@@ -54,6 +56,13 @@ export const sharedApplicationFields: ApplicationField[] = [
 ];
 
 export const applicationFields: Record<ApplicationType, ApplicationField[]> = {
+  CUSTOMER: [
+    { name: "serviceInterest", label: "Which ROVA service interests you most?", kind: "select", required: true, options: ["Passenger rides", "Taxi rides", "Food delivery", "Package delivery", "Run Errandz", "Kiddie Ridz", "Multiple services"] },
+    { name: "expectedUsage", label: "How often do you expect to use ROVA?", kind: "select", required: true, options: ["Daily", "Several times a week", "Weekly", "Occasionally", "Not sure yet"] },
+    { name: "preferredArea", label: "Where would you mainly use ROVA?", kind: "text" },
+    { name: "runErrandzInterest", label: "Interested in reserving a driver by the hour?", kind: "select", options: ["Yes", "Maybe", "No"] },
+    { name: "kiddieRidzInterest", label: "Interested in future trusted school transportation?", kind: "select", options: ["Yes", "Maybe", "No"] },
+  ],
   MOTORCYCLE_RIDER: [
     { name: "currentlyRides", label: "Do you currently ride motorcycles?", kind: "select", required: true, options: ["Yes", "No"] },
     { name: "experienceYears", label: "Years of riding experience", kind: "select", required: true, options: ["Less than 1 year", "1–2 years", "3–5 years", "6+ years"] },
@@ -122,6 +131,7 @@ export const applicationFields: Record<ApplicationType, ApplicationField[]> = {
 };
 
 const additionalFields: Record<ApplicationType, ApplicationField[]> = {
+  CUSTOMER: [],
   MOTORCYCLE_RIDER: [],
   TAXI_DRIVER: [
     { name: "vehicleAccessInterest", label: "Interested in future vehicle-access opportunities?", kind: "select", options: ["Yes", "No", "I need more information"] },

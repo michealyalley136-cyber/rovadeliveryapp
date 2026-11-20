@@ -16,6 +16,7 @@ type Answers = Record<string, string>;
 type Draft = { version: 2; type: ApplicationType | null; step: number; answers: Answers; selectedId: string | null };
 
 const steps = ["Opportunity", "About You", "Location & Experience", "Vehicle / Business Details", "Goals & Availability", "Review & Submit"];
+const customerSteps = ["Opportunity", "About You", "Location & Interests", "ROVA Services", "Preferences", "Review & Submit"];
 const experienceNames = new Set(["region", "currentlyRides", "experienceYears", "licenceStatus"]);
 const goalNames = new Set(["availability", "preferredArea", "workInterests", "serviceInterest", "accessInterest", "vehicleAccess", "vehicleAccessInterest", "depositReadiness", "partnershipInterest", "rovaDeliveryInterest"]);
 function selectedVisualId(type: ApplicationType | null, answers: Answers) {
@@ -28,6 +29,11 @@ function fieldsForStep(type: ApplicationType | null, step: number): ApplicationF
   if (!type) return [];
   const fields = applicationFields[type];
   if (step === 2) return [...sharedApplicationFields.filter((field) => field.name === "city" || field.name === "area"), ...fields.filter((field) => experienceNames.has(field.name))];
+  if (type === "CUSTOMER") {
+    if (step === 3) return fields.filter((field) => field.name === "serviceInterest" || field.name === "preferredArea");
+    if (step === 4) return fields.filter((field) => ["expectedUsage", "runErrandzInterest", "kiddieRidzInterest"].includes(field.name));
+    return [];
+  }
   if (step === 3) return fields.filter((field) => !experienceNames.has(field.name) && !goalNames.has(field.name));
   if (step === 4) return fields.filter((field) => goalNames.has(field.name));
   return [];
@@ -62,6 +68,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
   const secondaryTypes = applicationTypeOptions.filter((item) => (item.type === "DELIVERY_PARTNER" || item.type === "STRATEGIC_PARTNER") && (!enabledTypes || enabledTypes.includes(item.type)));
   const option = applicationTypeOptions.find((item) => item.type === type);
   const selectedLabel = visualOptions.find((item) => item.id === selectedId)?.label ?? option?.label;
+  const stepTitles = type === "CUSTOMER" ? customerSteps : steps;
 
   useEffect(() => {
     const onDraftError = () => setDraftMessage("This browser could not save a local draft. Continue to submit when ready.");
@@ -234,7 +241,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
     return <main className="apply-page"><ApplyHeader /><section className="application-success"><div className="section-kicker">ROVA GHANA · PRE-LAUNCH</div><h1>Applications for this opportunity are currently paused.</h1><p>We’re preparing the ROVA network and will share updates as opportunities open.</p><Link className="apply-primary" href="/">Return to ROVA <span>↗</span></Link></section><ApplyFooter /></main>;
   }
   if (submitted) {
-    return <main className="apply-page"><ApplyHeader /><section className="application-success"><span className="success-icon" aria-hidden="true">✓</span><div className="section-kicker">ROVA GHANA · PRE-LAUNCH</div><h1>Application Received</h1><p>Thank you for your interest in joining the ROVA network. Your application has been received. Our Ghana operations team will review your information and contact you if additional information is required.</p><p>Submitting an application does not guarantee approval, employment or vehicle access.</p>{reference && <div className="reference-card"><small>APPLICATION REFERENCE</small><strong>{reference}</strong></div>}{draftMessage && <p role="status">{draftMessage}</p>}<div className="success-actions"><Link className="apply-primary" href="/application-status">Check Application Status <span>→</span></Link><Link className="wizard-back" href="/">Return to ROVA</Link></div></section><ApplyFooter /></main>;
+    return <main className="apply-page"><ApplyHeader /><section className="application-success"><span className="success-icon" aria-hidden="true">✓</span><div className="section-kicker">ROVA GHANA · PRE-LAUNCH</div>{type === "CUSTOMER" ? <><h1>Registration Received</h1><p>Thank you for registering your interest in ROVA Ghana.</p><p>We&apos;ll use your information to keep you informed as ROVA services become available in your area.</p></> : <><h1>Application Received</h1><p>Thank you for your interest in joining the ROVA network. Your application has been received. Our Ghana operations team will review your information and contact you if additional information is required.</p><p>Submitting an application does not guarantee approval, employment or vehicle access.</p></>}{reference && <div className="reference-card"><small>APPLICATION REFERENCE</small><strong>{reference}</strong></div>}{draftMessage && <p role="status">{draftMessage}</p>}<div className="success-actions"><Link className="apply-primary" href="/application-status">Check Application Status <span>→</span></Link><Link className="wizard-back" href="/">Return to ROVA</Link></div></section><ApplyFooter /></main>;
   }
 
   const descriptions = [
@@ -251,14 +258,14 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
     <section className={`apply-intro ${step === 0 ? "apply-intro-selection" : ""}`}>
       <div className="section-kicker">ROVA GHANA · PRE-LAUNCH APPLICATION</div>
       <h1>Join the <em>ROVA Network</em></h1>
-      {step !== 0 && <><p>Choose how you want to work, earn, grow, or partner with ROVA Ghana. We’ll guide you through the application step by step.</p>
+      {step !== 0 && <><p>{type === "CUSTOMER" ? "Register your interest in using future ROVA services. We’ll guide you through the registration step by step." : "Choose how you want to work, earn, grow, or partner with ROVA Ghana. We’ll guide you through the application step by step."}</p>
       <ul className="apply-trust"><li>Secure application</li><li>Simple process</li><li>Ghana-focused support</li></ul></>}
     </section>
     <section className={`apply-shell ${step === 0 ? "apply-shell-selection" : ""}`} aria-labelledby="wizard-title">
-      <div className="wizard-heading"><div><span className="section-kicker">STEP {step + 1} OF {steps.length}</span><h2 id="wizard-title" ref={headingRef} tabIndex={-1}>{step === 0 ? "How would you like to join ROVA?" : steps[step]}</h2>{step !== 0 && <p>{descriptions[step]}</p>}</div><button type="button" className="resume-draft" onClick={resumeDraft}>Resume a saved draft</button></div>
+      <div className="wizard-heading"><div><span className="section-kicker">STEP {step + 1} OF {steps.length}</span><h2 id="wizard-title" ref={headingRef} tabIndex={-1}>{step === 0 ? "How would you like to join ROVA?" : stepTitles[step]}</h2>{step !== 0 && <p>{type === "CUSTOMER" && step === 2 ? "Tell us where you’re based." : type === "CUSTOMER" && step === 3 ? "Tell us which services interest you." : type === "CUSTOMER" && step === 4 ? "Tell us your preferences." : descriptions[step]}</p>}</div><button type="button" className="resume-draft" onClick={resumeDraft}>Resume a saved draft</button></div>
       <div className="wizard-progress-wrap">
         <div className="wizard-progress-bar" role="progressbar" aria-label="Application progress" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={step + 1}><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div>
-        <ol className="wizard-step-labels">{["Opportunity", "About You", "Experience", "Details", "Goals", "Review"].map((label, index) => <li key={label} aria-current={index === step ? "step" : undefined} className={index === step ? "active" : index < step ? "done" : ""}>{label}</li>)}</ol>
+        <ol className="wizard-step-labels">{(type === "CUSTOMER" ? ["Opportunity", "About You", "Location", "Services", "Preferences", "Review"] : ["Opportunity", "About You", "Experience", "Details", "Goals", "Review"]).map((label, index) => <li key={label} aria-current={index === step ? "step" : undefined} className={index === step ? "active" : index < step ? "done" : ""}>{label}</li>)}</ol>
       </div>
       <div className="wizard-body">
         {step === 0 && <>
@@ -273,8 +280,8 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
         </>}
         {step === 5 && <div className="application-review">
           <div className="review-section"><div className="review-section-heading"><h3>Opportunity</h3><button type="button" onClick={() => setStep(0)}>Edit</button></div><p>{option?.label}</p></div>
-          {[1, 2, 3, 4].map((index) => <div className="review-section" key={index}><div className="review-section-heading"><h3>{steps[index]}</h3><button type="button" onClick={() => setStep(index)}>Edit</button></div><dl className="review-summary">{fieldsForStep(type, index).filter((field) => answers[field.name]?.trim()).map((field) => <div key={field.name}><dt>{field.label}</dt><dd>{answers[field.name]}</dd></div>)}</dl></div>)}
-          <label className="application-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I agree that ROVA Ghana may use the information I provide to review this pre-launch application and contact me about relevant opportunities. I understand this is not a service booking and does not guarantee approval, employment or vehicle access. I have read the <Link href="/privacy" target="_blank">Privacy Notice</Link>.</span></label>
+          {[1, 2, 3, 4].map((index) => <div className="review-section" key={index}><div className="review-section-heading"><h3>{stepTitles[index]}</h3><button type="button" onClick={() => setStep(index)}>Edit</button></div><dl className="review-summary">{fieldsForStep(type, index).filter((field) => answers[field.name]?.trim()).map((field) => <div key={field.name}><dt>{field.label}</dt><dd>{answers[field.name]}</dd></div>)}</dl></div>)}
+          <label className="application-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>{type === "CUSTOMER" ? "I agree that ROVA Ghana may use the information I provide to review my registration and contact me about future services. I understand this is not a service booking and services are not currently available. I have read the " : "I agree that ROVA Ghana may use the information I provide to review this pre-launch application and contact me about relevant opportunities. I understand this is not a service booking and does not guarantee approval, employment or vehicle access. I have read the "}<Link href="/privacy" target="_blank">Privacy Notice</Link>.</span></label>
         </div>}
       </div>
       {error && <p className="apply-error" role="alert">{error}</p>}

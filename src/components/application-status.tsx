@@ -21,6 +21,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const typeLabels: Record<string, string> = {
+  CUSTOMER: "User",
   MOTORCYCLE_RIDER: "Motorcycle Rider",
   TAXI_DRIVER: "Taxi Driver",
   DELIVERY_PARTNER: "Delivery Partner",
