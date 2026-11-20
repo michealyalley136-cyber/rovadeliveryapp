@@ -4,12 +4,39 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource } from "maplibre-gl";
 import type { SimulationRide } from "@/lib/ride-simulation";
 import { radiusFor, searchElapsed } from "@/lib/ride-simulation";
+import { SimulatedDriverLocationProvider, syntheticPickup, syntheticRoads } from "@/lib/simulated-driver-location";
+import { distanceMeters } from "@/server/dispatch/geography";
+import { initialVehicleOrientation, orientVehicle, sideViewScale, type VehicleOrientation } from "@/lib/vehicle-orientation";
+import type { VehicleType } from "@/lib/driver-location";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-const pickup: [number, number] = [-0.187, 5.6037];
+const pickup = syntheticPickup;
 const destination: [number, number] = [-0.163, 5.6177];
 const route: [number, number][] = [pickup, [-0.179, 5.6037], [-0.179, 5.6107], [-0.163, 5.6107], destination];
 const approach: [number, number][] = [[pickup[0] - .016, pickup[1] - .007], [pickup[0] - .008, pickup[1] - .007], [pickup[0] - .008, pickup[1]], pickup];
+type VehicleMarker = { marker: maplibregl.Marker; icon: HTMLImageElement; orientation: VehicleOrientation };
+
+function createVehicleMarker(map: maplibregl.Map, vehicleType: VehicleType, position: [number, number]): VehicleMarker {
+  const element = document.createElement("div");
+  element.className = "simulation-vehicle";
+  const icon = document.createElement("img");
+  icon.className = "simulation-vehicle-icon";
+  icon.src = vehicleType === "RIDE" ? "/map-markers/motorcycle.svg" : "/map-markers/cab.svg";
+  icon.alt = "";
+  element.appendChild(icon);
+  return { marker: new maplibregl.Marker({ element, rotationAlignment: "viewport" }).setLngLat(position).addTo(map), icon, orientation: { ...initialVehicleOrientation, facing: "right" } };
+}
+
+function updateVehicleOrientation(vehicle: VehicleMarker, headingDegrees: number | null, speedMetersPerSecond: number | null, bearing: number) {
+  vehicle.orientation = orientVehicle(vehicle.orientation, { headingDegrees, speedMetersPerSecond }, bearing, { kind: "side" });
+  vehicle.icon.style.transform = `scaleX(${sideViewScale(vehicle.orientation, "right")})`;
+}
+
+function pathHeading(points: [number, number][], fraction: number): number {
+  const index = Math.min(points.length - 2, Math.floor(Math.max(0, fraction) * (points.length - 1)));
+  const [a, b] = [points[index], points[index + 1]];
+  return Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI;
+}
 
 function interpolate(points: [number, number][], fraction: number): [number, number] {
   const progress = Math.max(0, Math.min(0.999999, fraction)) * (points.length - 1);
@@ -30,7 +57,7 @@ function circle(meters: number): GeoJSON.Feature<GeoJSON.Polygon> {
 export function SimulationMap({ ride, now }: { ride: SimulationRide; now: number }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const markersRef = useRef<Map<string, VehicleMarker>>(new Map());
   const rideRef = useRef({ ride, now });
   const [error, setError] = useState("");
   useEffect(() => { rideRef.current = { ride, now }; }, [ride, now]);
@@ -51,13 +78,12 @@ export function SimulationMap({ ride, now }: { ride: SimulationRide; now: number
     let frame = 0;
     let last = 0;
     let lastRadius = -1;
+    let simulationTime = 0;
+    const markers = markersRef.current;
+    const seed = Array.from(rideRef.current.ride.id).reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);
+    const provider = new SimulatedDriverLocationProvider(seed);
     map.on("load", () => {
-      const roads: GeoJSON.Feature<GeoJSON.LineString>[] = [];
-      for (let i = -8; i <= 8; i++) {
-        roads.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [[pickup[0] - .08, pickup[1] + i * .007], [pickup[0] + .08, pickup[1] + i * .007]] } });
-        roads.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [[pickup[0] + i * .008, pickup[1] - .06], [pickup[0] + i * .008, pickup[1] + .06]] } });
-      }
-      map.addSource("roads", { type: "geojson", data: { type: "FeatureCollection", features: roads } });
+      map.addSource("roads", { type: "geojson", data: syntheticRoads() });
       map.addLayer({ id: "roads", type: "line", source: "roads", paint: { "line-color": "#ffffff", "line-width": 3 } });
       map.addSource("radius", { type: "geojson", data: circle(0) });
       map.addLayer({ id: "radius", type: "fill", source: "radius", paint: { "fill-color": "#1cab6b", "fill-opacity": .13 } });
@@ -75,15 +101,15 @@ export function SimulationMap({ ride, now }: { ride: SimulationRide; now: number
         const el = document.createElement("div"); el.className = "simulation-pin"; el.style.background = color; el.setAttribute("aria-label", label);
         new maplibregl.Marker({ element: el }).setLngLat(point).addTo(map);
       }
-      for (let i = 0; i < 30; i++) {
-        const el = document.createElement("div"); el.className = "simulation-vehicle"; el.textContent = i % 2 ? "🚕" : "🏍";
-        markersRef.current.push(new maplibregl.Marker({ element: el }).setLngLat(pickup).addTo(map));
-      }
+      const assignedMarker = createVehicleMarker(map, rideRef.current.ride.service, pickup);
       const animate = (time: number) => {
         frame = requestAnimationFrame(animate);
         if (time - last < (reduced.matches ? 1000 : 50)) return;
+        const dt = last ? Math.min(1000, time - last) : 0;
         last = time;
         const state = rideRef.current.ride;
+        if (!state.paused && !reduced.matches) simulationTime += dt;
+        const locations = provider.locations(simulationTime);
         const current = Date.now();
         radar.style.display = state.status === "SEARCHING" && !state.paused ? "" : "none";
         map.setLayoutProperty("approach", "visibility", state.status === "APPROACHING" ? "visible" : "none");
@@ -95,25 +121,32 @@ export function SimulationMap({ ride, now }: { ride: SimulationRide; now: number
           const dy = radius / 110574;
           map.fitBounds([[pickup[0] - dx, pickup[1] - dy], [Math.max(destination[0], pickup[0] + dx), Math.max(destination[1], pickup[1] + dy)]], { padding: 45, duration: reduced.matches ? 0 : 800, maxZoom: 12 });
         }
-        markersRef.current.forEach((marker, i) => {
-          const el = marker.getElement();
-          const assigned = state.status === "APPROACHING" || state.status === "ARRIVED" || state.status === "IN_PROGRESS" || state.status === "COMPLETED";
-          el.style.display = assigned ? (i === 0 ? "" : "none") : (state.status === "SEARCHING" && i % 2 === (state.service === "RIDE" ? 0 : 1) ? "" : "none");
-          el.textContent = state.service === "RIDE" ? "🏍" : "🚕";
-          if (assigned) {
-            const progress = Math.max(0, ((state.paused ? state.startedAt : current) - state.phaseStartedAt) * state.speed);
-            marker.setLngLat(state.status === "APPROACHING" ? interpolate(approach, progress / 15000) : state.status === "IN_PROGRESS" ? interpolate(route, progress / 30000) : state.status === "COMPLETED" ? destination : pickup);
-          } else {
-            const offset = (Math.floor(i / 2) - 7) * .007;
-            const phase = reduced.matches ? 0 : ((state.paused ? state.startedAt : current) / 35000 + i / 30) % 1;
-            const path: [number, number][] = [[pickup[0] - .024, pickup[1] + offset], [pickup[0] + .024, pickup[1] + offset], [pickup[0] + .024, pickup[1] + offset + .007], [pickup[0] - .024, pickup[1] + offset + .007], [pickup[0] - .024, pickup[1] + offset]];
-            marker.setLngLat(interpolate(path, phase));
+        locations.forEach((location) => {
+          let vehicle = markers.get(location.driverId);
+          if (!vehicle) {
+            vehicle = createVehicleMarker(map, location.vehicleType, [location.longitude, location.latitude]);
+            markers.set(location.driverId, vehicle);
           }
+          const el = vehicle.marker.getElement();
+          const nearby = distanceMeters({ longitude: pickup[0], latitude: pickup[1] }, { longitude: location.longitude, latitude: location.latitude }) <= radius;
+          el.style.display = state.status === "SEARCHING" && location.vehicleType === state.service && location.availability === "AVAILABLE" && nearby ? "" : "none";
+          vehicle.marker.setLngLat([location.longitude, location.latitude]);
+          updateVehicleOrientation(vehicle, location.headingDegrees, location.speedMetersPerSecond, map.getBearing());
         });
+        const assigned = state.status === "APPROACHING" || state.status === "ARRIVED" || state.status === "IN_PROGRESS" || state.status === "COMPLETED";
+        assignedMarker.marker.getElement().style.display = assigned ? "" : "none";
+        if (assigned) {
+          const progress = Math.max(0, ((state.paused ? state.startedAt : current) - state.phaseStartedAt) * state.speed);
+          assignedMarker.marker.setLngLat(state.status === "APPROACHING" ? interpolate(approach, progress / 15000) : state.status === "IN_PROGRESS" ? interpolate(route, progress / 30000) : state.status === "COMPLETED" ? destination : pickup);
+          if (state.status === "APPROACHING" || state.status === "IN_PROGRESS") {
+            const points = state.status === "APPROACHING" ? approach : route;
+            updateVehicleOrientation(assignedMarker, pathHeading(points, progress / (state.status === "APPROACHING" ? 15000 : 30000)), state.paused ? 0 : 1, map.getBearing());
+          } else updateVehicleOrientation(assignedMarker, null, 0, map.getBearing());
+        }
       };
       frame = requestAnimationFrame(animate);
     });
-    return () => { cancelAnimationFrame(frame); markersRef.current = []; mapRef.current = null; map.remove(); };
+    return () => { cancelAnimationFrame(frame); markers.clear(); mapRef.current = null; map.remove(); };
   }, []);
 
   const elapsed = searchElapsed(ride, now);

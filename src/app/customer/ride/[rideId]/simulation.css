@@ -9,6 +9,7 @@
 .simulation-recenter { position: absolute; right: 10px; bottom: 10px; border: 0; border-radius: 8px; padding: 9px; color: #005b34; background: white; font-weight: 700; }
 .simulation-pin { height: 22px; width: 22px; border: 4px solid white; border-radius: 50%; box-shadow: 0 2px 6px #0005; }
 .simulation-vehicle { background: white; border: 1px solid #d5e6da; border-radius: 50%; padding: 4px; box-shadow: 0 2px 5px #0003; font-size: 17px; }
+.simulation-vehicle-icon { display: block; width: 23px; height: 18px; transform-origin: center; transition: transform .18s ease; }
 .simulation-radar { pointer-events: none; }
 .simulation-radar i { position: absolute; border: 2px solid #0b9a58; border-radius: 50%; width: 36px; height: 36px; animation: radar-pulse 3s ease-out infinite; }
 .simulation-radar i:nth-child(2) { animation-delay: 1.5s; }
@@ -23,4 +24,4 @@
 .simulation-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 .simulation-controls h2 { flex-basis: 100%; font-size: 17px; margin: 0; }
 .simulation-controls button, .simulation-controls select { padding: 10px; border: 1px solid #bad5c1; border-radius: 8px; background: white; }
-@media (prefers-reduced-motion: reduce) { .simulation-radar i { animation: none; opacity: .25; transform: translate(-50%, -50%); } }
+@media (prefers-reduced-motion: reduce) { .simulation-radar i { animation: none; opacity: .25; transform: translate(-50%, -50%); } .simulation-vehicle-icon { transition: none; } }

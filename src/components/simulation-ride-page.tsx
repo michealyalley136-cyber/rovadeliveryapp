@@ -60,6 +60,7 @@ export function SimulationRidePage({ rideId, controls }: { rideId: string; contr
         <h1>{ride.status === "SEARCHING" ? `Finding your ${ride.service === "RIDE" ? "rider" : "driver"}` : labels[ride.status]}</h1>
         <p><strong>From:</strong> {ride.pickup} <br /><strong>To:</strong> {ride.destination}</p>
         <p>The map is illustrative; addresses have not been geocoded and the route is not real.</p>
+        <p>Nearby vehicles are independent demo traffic. The assigned driver and approach are separately scripted.</p>
         {["APPROACHING", "ARRIVED", "IN_PROGRESS"].includes(ride.status) && <div className="simulation-driver"><span>{ride.service === "RIDE" ? "🏍" : "🚘"}</span><div><strong>Demo driver · Kofi</strong><small>Synthetic profile · {ride.status === "APPROACHING" ? `simulated ETA ${Math.max(0, Math.ceil((15000 - ((ride.paused ? ride.startedAt : now) - ride.phaseStartedAt) * ride.speed) / 1000))}s` : ride.status === "ARRIVED" ? "at pickup" : "journey in progress"}</small></div></div>}
         {ride.status === "ARRIVED" && <button className="customer-primary" onClick={() => change((current, time) => current.status === "ARRIVED" ? { ...current, status: "IN_PROGRESS", phaseStartedAt: time } : current)}>Verify demo pickup &amp; start</button>}
         {ride.status === "IN_PROGRESS" && <p>Simulated journey progress: {Math.min(100, Math.max(0, Math.floor(((ride.paused ? ride.startedAt : now) - ride.phaseStartedAt) * ride.speed / 300)))}%</p>}
