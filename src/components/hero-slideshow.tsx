@@ -10,7 +10,6 @@ const enabledSlides = getEnabledSlides(heroSlides);
 
 export function HeroSlideshow() {
   const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -27,12 +26,12 @@ export function HeroSlideshow() {
   }, []);
 
   useEffect(() => {
-    if (paused || reducedMotion || enabledSlides.length < 2) return;
+    if (reducedMotion || enabledSlides.length < 2) return;
     const timer = window.setTimeout(() => {
       setActive((current) => getNextSlideIndex(current, enabledSlides.length));
     }, slide?.duration ?? 6000);
     return () => window.clearTimeout(timer);
-  }, [active, paused, reducedMotion, slide?.duration]);
+  }, [active, reducedMotion, slide?.duration]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -115,41 +114,6 @@ export function HeroSlideshow() {
         <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span /><span /></button>
       </header>
       {slide && <h1 className="visually-hidden" aria-live="polite">{slide.headline}</h1>}
-      {slide && (
-        <div className="campaign-utility">
-          <span><i /> ROVA GHANA · PRE-LAUNCH</span>
-          {process.env.NODE_ENV !== "production" && (
-            <span className="slide-debug" aria-hidden="true">
-              {active + 1} / {enabledSlides.length} — {slide.id}
-            </span>
-          )}
-          <Link href={slide.ctaHref}>{slide.ctaLabel} <b>↗</b></Link>
-        </div>
-      )}
-      <div className="slide-controls" aria-label="Campaign slideshow controls">
-        <button className="slide-arrow" onClick={goPrevious} aria-label="Previous slide">←</button>
-        <div className="slide-progress">
-          {enabledSlides.map((item, index) => (
-            <button
-              key={item.id}
-              className={`progress-track ${index === active ? "current" : index < active ? "past" : ""}`}
-              aria-label={`Show slide ${index + 1}`}
-              aria-current={index === active ? "true" : undefined}
-              onClick={() => setActive(index)}
-            >
-              <span
-                style={{
-                  animationDuration: `${item.duration}ms`,
-                  animationPlayState: index === active && !paused && !reducedMotion ? "running" : "paused",
-                }}
-              />
-            </button>
-          ))}
-        </div>
-        <button className="slide-arrow" onClick={goNext} aria-label="Next slide">→</button>
-        <button className="slide-pause" onClick={() => setPaused((value) => !value)} aria-label={paused ? "Play slideshow" : "Pause slideshow"}>{paused ? "▶" : "Ⅱ"}</button>
-      </div>
-      <a className="hero-scroll" href="#about"><span /> SCROLL TO EXPLORE</a>
     </section>
   );
 }
