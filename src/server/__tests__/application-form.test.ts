@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { applicationFields, applicationTypes } from "../../config/application-types";
+import { applicationFields, applicationTypes, isApplicationType } from "../../config/application-types";
 
 const mocks = vi.hoisted(() => ({
   createApplication: vi.fn(),
@@ -58,5 +58,21 @@ describe("application form API compatibility", () => {
 
     expect(response.status).toBe(201);
     expect(mocks.createApplication).toHaveBeenCalledWith(expect.objectContaining({ type: "MERCHANT", data: expect.objectContaining({ businessCategory: "Restaurant" }) }));
+  });
+
+  it("accepts and forwards customer registration interests", async () => {
+    expect(isApplicationType("CUSTOMER")).toBe(true);
+    const data = { region: "Greater Accra", serviceInterest: "Kiddie Ridz", expectedUsage: "Weekly", runErrandzInterest: "Maybe", kiddieRidzInterest: "Yes" };
+    const response = await POST(request({ type: "CUSTOMER", firstName: "Test", lastName: "Applicant", phone: "0241234567", city: "Accra", consent: true, data }));
+    expect(response.status).toBe(201);
+    expect(mocks.createApplication).toHaveBeenCalledWith(expect.objectContaining({ type: "CUSTOMER", data }));
+  });
+
+  it("rejects invalid customer services and missing required registration details", async () => {
+    const base = { type: "CUSTOMER", firstName: "Test", lastName: "Applicant", phone: "0241234567", city: "Accra", consent: true };
+    expect((await POST(request({ ...base, data: { serviceInterest: "Invalid", expectedUsage: "Daily" } }))).status).toBe(400);
+    expect((await POST(request({ ...base, data: { serviceInterest: "Taxi rides" } }))).status).toBe(400);
+    expect((await POST(request({ ...base, firstName: "", data: { serviceInterest: "Taxi rides", expectedUsage: "Daily" } }))).status).toBe(400);
+    expect(mocks.createApplication).not.toHaveBeenCalled();
   });
 });

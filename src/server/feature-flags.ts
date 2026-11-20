@@ -2,6 +2,7 @@ import "server-only";
 
 export const featureFlags = {
   applicationsEnabled: process.env.APPLICATIONS_ENABLED !== "false",
+  customerApplicationsEnabled: process.env.CUSTOMER_APPLICATIONS_ENABLED !== "false",
   riderApplicationsEnabled: process.env.RIDER_APPLICATIONS_ENABLED !== "false",
   driverApplicationsEnabled: process.env.DRIVER_APPLICATIONS_ENABLED !== "false",
   deliveryApplicationsEnabled: process.env.DELIVERY_APPLICATIONS_ENABLED !== "false",
@@ -16,6 +17,7 @@ export const featureFlags = {
 
 export function isApplicationEnabled(type: string) {
   if (!featureFlags.applicationsEnabled) return false;
+  if (type === "CUSTOMER") return featureFlags.customerApplicationsEnabled;
   if (type === "MOTORCYCLE_RIDER") return featureFlags.riderApplicationsEnabled;
   if (type === "TAXI_DRIVER") return featureFlags.driverApplicationsEnabled;
   if (type === "DELIVERY_PARTNER") return featureFlags.deliveryApplicationsEnabled;

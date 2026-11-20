@@ -7,6 +7,7 @@ Copy `.env.example` to `.env.local` for local work.
 | `DATABASE_URL` | PostgreSQL connection used by the Prisma application/admin repositories |
 | `AUTH_SECRET` | Random session-signing key (minimum 32 characters) |
 | `APPLICATIONS_ENABLED` | Global application intake switch (defaults to enabled) |
+| `CUSTOMER_APPLICATIONS_ENABLED` | Customer pre-launch registration intake switch |
 | `RIDER_APPLICATIONS_ENABLED` | Motorcycle rider application intake switch |
 | `DRIVER_APPLICATIONS_ENABLED` | Taxi driver application intake switch |
 | `DELIVERY_APPLICATIONS_ENABLED` | Delivery partner application intake switch |
@@ -20,3 +21,5 @@ Copy `.env.example` to `.env.local` for local work.
 | `ROVA_DEMO_MODE` | Legacy isolated demo setting; never use for real customer accounts |
 
 Set deployment-specific variables in the hosting provider's secret manager. Do not commit credentials or applicant information. Admin provisioning reads `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD`, and optional `ADMIN_ROLE` from the process environment; keep the password out of shell history and logs. See the [README](./README.md) for the setup steps.
+
+Deploy the additive Prisma migration with `npx prisma migrate deploy` before enabling a version that accepts customer registrations. It does not activate customer ride services.
