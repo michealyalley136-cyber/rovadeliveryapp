@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { customerServices } from "@/config/customer-services";
+import { createSimulation, isActiveSimulation, readSimulations } from "@/lib/ride-simulation";
 
 export function CustomerBooking({ service }: { service: "RIDE" | "TAXI" }) {
   const router = useRouter();
@@ -33,11 +34,11 @@ export function CustomerBooking({ service }: { service: "RIDE" | "TAXI" }) {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/rides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pickup: form.get("pickup"), destination: form.get("destination"), service }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Could not create the demo ride.");
-      router.push("/customer");
-      router.refresh();
+      const pickup = String(form.get("pickup") ?? "").trim();
+      const destination = String(form.get("destination") ?? "").trim();
+      if (pickup.length < 3 || destination.length < 3) throw new Error("Enter a pickup and destination.");
+      const ride = createSimulation(service, pickup, destination);
+      router.push(`/customer/ride/${ride.id}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not create the demo ride.");
       setBusy(false);
@@ -53,6 +54,12 @@ export function CustomerBooking({ service }: { service: "RIDE" | "TAXI" }) {
         <h1>{details.title}</h1>
         <p>This booking is simulated. No real driver, dispatch or payment is involved.</p>
         {error && <p className="customer-alert" role="alert">{error}</p>}
+        {error && <button className="customer-primary" type="button" onClick={() => {
+          try {
+            const active = readSimulations().find(isActiveSimulation);
+            if (active) router.push(`/customer/ride/${active.id}`);
+          } catch { setError("Saved demo journeys could not be read."); }
+        }}>Resume active demo journey</button>}
         <form onSubmit={submit}>
           <label>Pickup location<input name="pickup" ref={pickupRef} placeholder="Enter pickup" minLength={3} maxLength={120} required /></label>
           <label>Destination<input name="destination" ref={destinationRef} placeholder="Enter destination" minLength={3} maxLength={120} required /></label>
