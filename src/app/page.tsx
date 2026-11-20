@@ -1,5 +1,5 @@
-import { MarketingSite } from "@/components/marketing-site";
+import { HeroSlideshow } from "@/components/hero-slideshow";
 
 export default function HomePage() {
-  return <MarketingSite />;
+  return <main className="home-screen"><HeroSlideshow /></main>;
 }

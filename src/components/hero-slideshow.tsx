@@ -104,14 +104,11 @@ export function HeroSlideshow() {
       <div className="campaign-overlay" />
       <header className={`campaign-nav ${scrolled ? "nav-scrolled" : ""}`}>
         <Link className="campaign-logo" href="/" aria-label="ROVA Ghana home">ROVA<span>.</span></Link>
-        <nav className={menuOpen ? "campaign-links menu-open" : "campaign-links"} aria-label="Main navigation">
-          <a href="#about" onClick={() => setMenuOpen(false)}>About</a>
-          <a href="#opportunities" onClick={() => setMenuOpen(false)}>Opportunities</a>
-          <a href="#partners" onClick={() => setMenuOpen(false)}>Partners</a>
-          <a href="#safety" onClick={() => setMenuOpen(false)}>Safety</a>
-          <Link className="nav-apply" href="/apply">Apply now <span>↗</span></Link>
+        <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-controls="campaign-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span /><span /></button>
+        <nav id="campaign-navigation" className={menuOpen ? "campaign-links menu-open" : "campaign-links"} aria-label="Main navigation">
+          <Link href="/application-status" onClick={() => setMenuOpen(false)}>Application status</Link>
+          <Link className="nav-apply" href="/apply" onClick={() => setMenuOpen(false)}>Apply now <span>↗</span></Link>
         </nav>
-        <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span /><span /></button>
       </header>
       {slide && <h1 className="visually-hidden" aria-live="polite">{slide.headline}</h1>}
     </section>
