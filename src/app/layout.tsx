@@ -14,10 +14,10 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "ROVA", statusBarStyle: "default" },
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      ...[16, 32, 48, 64].map((size) => ({ url: `/icons/favicon-${size}x${size}.png`, sizes: `${size}x${size}`, type: "image/png" })),
+      { url: "/favicon.ico?v=2", sizes: "any" },
+      ...[16, 32, 48, 64].map((size) => ({ url: `/icons/favicon-${size}x${size}.png?v=2`, sizes: `${size}x${size}`, type: "image/png" })),
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
     title: "ROVA Ghana | Move. Deliver. Earn.",

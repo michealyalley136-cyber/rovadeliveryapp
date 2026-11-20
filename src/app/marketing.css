@@ -185,8 +185,11 @@
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-.install-rova { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 8px 20px; background: #061538; color: #fff; font-size: 13px; }
+.install-rova { position: fixed; z-index: 60; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); color: #fff; font-size: 13px; }
 .install-rova button { border: 1px solid #e4b74f; border-radius: 4px; background: transparent; color: #fff; padding: 7px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+.install-rova > button { background: #061538; box-shadow: 0 2px 8px #0006; }
+.install-rova-help { position: absolute; right: 0; bottom: calc(100% + 8px); width: min(300px, calc(100vw - 24px)); padding: 16px; border: 1px solid #e4b74f; border-radius: 6px; background: #061538; box-shadow: 0 4px 20px #0007; line-height: 1.5; }
+.install-rova-help p { margin: 8px 0 12px; }
 .install-rova button:focus-visible { outline: 3px solid #e4b74f; outline-offset: 3px; }
 .campaign-links>a:not(.nav-apply) { color: #fff; text-shadow: 0 1px 5px #071d3960; }
 .campaign-nav.nav-scrolled .campaign-links>a:not(.nav-apply) { color: #435163; text-shadow: none; }

@@ -26,10 +26,10 @@ describe("installable app icons", () => {
 
   it("references existing correctly sized icons in the install manifest", () => {
     const manifest = JSON.parse(read("manifest.webmanifest").toString()) as {
-      name: string; short_name: string; start_url: string; scope: string; display: string;
+      id: string; name: string; short_name: string; start_url: string; scope: string; display: string;
       icons: { src: string; sizes: string; type: string; purpose?: string }[];
     };
-    expect(manifest).toMatchObject({ name: "ROVA Ghana", short_name: "ROVA", start_url: "/", scope: "/", display: "standalone" });
+    expect(manifest).toMatchObject({ id: "/", name: "ROVA Ghana", short_name: "ROVA", start_url: "/", scope: "/", display: "standalone" });
     for (const icon of manifest.icons) {
       const png = read(icon.src.slice(1));
       expect(icon.type).toBe("image/png");
