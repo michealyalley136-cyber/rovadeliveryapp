@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ApplicationOptionCarousel, visualOptions, type VisualOption } from "@/components/application-option-carousel";
 import {
   applicationFields,
   applicationTypeOptions,
@@ -12,12 +13,15 @@ import {
 } from "@/config/application-types";
 
 type Answers = Record<string, string>;
-type Draft = { version: 2; type: ApplicationType | null; step: number; answers: Answers };
+type Draft = { version: 2; type: ApplicationType | null; step: number; answers: Answers; selectedId: string | null };
 
 const steps = ["Opportunity", "About You", "Location & Experience", "Vehicle / Business Details", "Goals & Availability", "Review & Submit"];
 const experienceNames = new Set(["region", "currentlyRides", "experienceYears", "licenceStatus"]);
 const goalNames = new Set(["availability", "preferredArea", "workInterests", "serviceInterest", "accessInterest", "vehicleAccess", "vehicleAccessInterest", "depositReadiness", "partnershipInterest", "rovaDeliveryInterest"]);
-const icons = ["↗", "⌑", "⇢", "◉", "◌", "▤", "◇", "✳"];
+function selectedVisualId(type: ApplicationType | null, answers: Answers) {
+  if (type === "MERCHANT") return answers.businessCategory === "Restaurant" ? "restaurant" : "merchant";
+  return visualOptions.find((option) => option.type === type)?.id ?? null;
+}
 
 function fieldsForStep(type: ApplicationType | null, step: number): ApplicationField[] {
   if (step === 1) return sharedApplicationFields.filter((field) => field.name !== "city" && field.name !== "area");
@@ -41,6 +45,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
   enabledTypes?: ApplicationType[];
 }) {
   const [type, setType] = useState<ApplicationType | null>(initialType);
+  const [selectedId, setSelectedId] = useState<string | null>(() => selectedVisualId(initialType, {}));
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [consent, setConsent] = useState(false);
@@ -53,8 +58,10 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
   const [saveDraft, setSaveDraft] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(step);
-  const visibleTypes = applicationTypeOptions.filter((item) => !enabledTypes || enabledTypes.includes(item.type));
+  const visibleOptions = useMemo(() => visualOptions.filter((item) => !enabledTypes || enabledTypes.includes(item.type)), [enabledTypes]);
+  const secondaryTypes = applicationTypeOptions.filter((item) => (item.type === "DELIVERY_PARTNER" || item.type === "STRATEGIC_PARTNER") && (!enabledTypes || enabledTypes.includes(item.type)));
   const option = applicationTypeOptions.find((item) => item.type === type);
+  const selectedLabel = visualOptions.find((item) => item.id === selectedId)?.label ?? option?.label;
 
   useEffect(() => {
     const onDraftError = () => setDraftMessage("This browser could not save a local draft. Continue to submit when ready.");
@@ -65,11 +72,11 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
   useEffect(() => {
     if (!saveDraft || submitted) return;
     try {
-      localStorage.setItem("rova-application-draft", JSON.stringify({ version: 2, type, step, answers } satisfies Draft));
+      localStorage.setItem("rova-application-draft", JSON.stringify({ version: 2, type, step, answers, selectedId } satisfies Draft));
     } catch {
       window.dispatchEvent(new Event("rova-draft-storage-error"));
     }
-  }, [answers, saveDraft, step, submitted, type]);
+  }, [answers, saveDraft, selectedId, step, submitted, type]);
 
   useEffect(() => {
     if (previousStep.current !== step) {
@@ -96,6 +103,8 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
       const oldStep = "step" in draft && typeof draft.step === "number" && Number.isInteger(draft.step) ? draft.step : 0;
       const savedStep = "version" in draft && draft.version === 2 ? oldStep : [0, 1, 3, 5][Math.min(Math.max(oldStep, 0), 3)];
       setType(savedType);
+      const savedVisual = "selectedId" in draft ? visualOptions.find((item) => item.id === draft.selectedId && item.type === savedType) : undefined;
+      setSelectedId(savedVisual?.id ?? selectedVisualId(savedType, savedAnswers));
       setStep(savedType ? Math.min(Math.max(savedStep, 0), 5) : 0);
       setAnswers(savedAnswers);
       setConsent(false);
@@ -116,6 +125,25 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
       delete next[name];
       return next;
     });
+  }
+
+  function chooseType(nextType: ApplicationType, visual?: VisualOption) {
+    const changedType = type !== nextType;
+    if (changedType || (visual?.id === "restaurant" && selectedId !== "restaurant")) {
+      setAnswers((current) => {
+        const next = changedType
+          ? Object.fromEntries(sharedApplicationFields.map((field) => [field.name, current[field.name] ?? ""]))
+          : { ...current };
+        if (visual?.id === "restaurant") next.businessCategory = "Restaurant";
+        return next;
+      });
+      setConsent(false);
+    }
+    setType(nextType);
+    setSelectedId(visual?.id ?? null);
+    setSaveDraft(true);
+    setError("");
+    setErrors({});
   }
 
   function validateStep(currentStep: number) {
@@ -220,26 +248,24 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
 
   return <main className="apply-page">
     <ApplyHeader />
-    <section className="apply-intro">
+    <section className={`apply-intro ${step === 0 ? "apply-intro-selection" : ""}`}>
       <div className="section-kicker">ROVA GHANA · PRE-LAUNCH APPLICATION</div>
       <h1>Join the <em>ROVA Network</em></h1>
-      <p>Choose how you want to work, earn, grow, or partner with ROVA Ghana. We’ll guide you through the application step by step.</p>
-      <ul className="apply-trust"><li>Secure application</li><li>Simple process</li><li>Ghana-focused support</li></ul>
+      {step !== 0 && <><p>Choose how you want to work, earn, grow, or partner with ROVA Ghana. We’ll guide you through the application step by step.</p>
+      <ul className="apply-trust"><li>Secure application</li><li>Simple process</li><li>Ghana-focused support</li></ul></>}
     </section>
-    <section className="apply-shell" aria-labelledby="wizard-title">
-      <div className="wizard-heading"><div><span className="section-kicker">STEP {step + 1} OF {steps.length}</span><h2 id="wizard-title" ref={headingRef} tabIndex={-1}>{step === 0 ? "How would you like to join ROVA?" : steps[step]}</h2><p>{descriptions[step]}</p></div><button type="button" className="resume-draft" onClick={resumeDraft}>Resume a saved draft</button></div>
+    <section className={`apply-shell ${step === 0 ? "apply-shell-selection" : ""}`} aria-labelledby="wizard-title">
+      <div className="wizard-heading"><div><span className="section-kicker">STEP {step + 1} OF {steps.length}</span><h2 id="wizard-title" ref={headingRef} tabIndex={-1}>{step === 0 ? "How would you like to join ROVA?" : steps[step]}</h2>{step !== 0 && <p>{descriptions[step]}</p>}</div><button type="button" className="resume-draft" onClick={resumeDraft}>Resume a saved draft</button></div>
       <div className="wizard-progress-wrap">
         <div className="wizard-progress-bar" role="progressbar" aria-label="Application progress" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={step + 1}><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div>
         <ol className="wizard-step-labels">{["Opportunity", "About You", "Experience", "Details", "Goals", "Review"].map((label, index) => <li key={label} aria-current={index === step ? "step" : undefined} className={index === step ? "active" : index < step ? "done" : ""}>{label}</li>)}</ol>
       </div>
       <div className="wizard-body">
-        {step === 0 && (visibleTypes.length ? <div className="application-type-grid" role="group" aria-label="Application opportunities">{visibleTypes.map((item, index) => <button type="button" aria-pressed={type === item.type} className={type === item.type ? "type-card selected" : "type-card"} key={item.type} onClick={() => {
-          if (type !== item.type) {
-            setAnswers((current) => Object.fromEntries(sharedApplicationFields.map((field) => [field.name, current[field.name] ?? ""])));
-            setConsent(false);
-          }
-          setType(item.type); setSaveDraft(true); setError(""); setErrors({});
-        }}><span className="type-card-icon" aria-hidden="true">{icons[applicationTypeOptions.findIndex((entry) => entry.type === item.type)]}</span><span className="type-card-number">0{index + 1}</span><strong>{item.label}</strong><small>{item.description}</small><i aria-hidden="true">{type === item.type ? "✓" : "＋"}</i></button>)}</div> : <div className="apply-closed">Applications are temporarily paused. Please check back for updates.</div>)}
+        {step === 0 && <>
+          {visibleOptions.length > 0 && <ApplicationOptionCarousel options={visibleOptions} selectedId={selectedId} onSelect={(item) => chooseType(item.type, item)} />}
+          {secondaryTypes.length > 0 && <div className="other-opportunities"><span>Other opportunities</span><div>{secondaryTypes.map((item) => <button type="button" key={item.type} aria-pressed={type === item.type} onClick={() => chooseType(item.type)}>{item.label}{type === item.type && " ✓"}</button>)}</div></div>}
+          {visibleOptions.length === 0 && secondaryTypes.length === 0 && <div className="apply-closed">Applications are temporarily paused. Please check back for updates.</div>}
+        </>}
         {step > 0 && step < 5 && <>
           {type === "VEHICLE_ACCESS" && step === 3 && <p className="application-note">ROVA plans to work with vehicle, financing, and fleet partners to expand access to work-ready vehicles. Availability and approval depend on partner requirements.</p>}
           <div className="application-fields">{fieldsForStep(type, step).map((field) => <Field key={field.name} field={field} value={answers[field.name] ?? ""} error={errors[field.name]} onChange={updateAnswer} />)}</div>
@@ -253,7 +279,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
       </div>
       {error && <p className="apply-error" role="alert">{error}</p>}
       {draftMessage && <p className="draft-message" role="status">{draftMessage}</p>}
-      <div className="wizard-actions"><div>{step > 0 ? <button type="button" className="wizard-back" onClick={() => { setStep((current) => current - 1); setError(""); setErrors({}); setSaveDraft(true); }}>← Back</button> : <Link className="wizard-back" href="/">← Back to ROVA</Link>}<span>Drafts stay in this browser until you submit.</span></div>{step < 5 ? <button type="button" className="apply-primary" onClick={nextStep}>Continue <span>→</span></button> : <button type="button" className="apply-primary" onClick={() => void submitApplication()} disabled={submitting}>{submitting ? "Submitting…" : "Submit Application"} <span>↗</span></button>}</div>
+      <div className="wizard-actions"><div>{step > 0 ? <button type="button" className="wizard-back" onClick={() => { setStep((current) => current - 1); setError(""); setErrors({}); setSaveDraft(true); }}>← Back</button> : <Link className="wizard-back" href="/">← Back to ROVA</Link>}<span>Drafts stay in this browser until you submit.</span></div>{step < 5 ? <button type="button" className="apply-primary" disabled={step === 0 && !type} onClick={nextStep}>{step === 0 && selectedLabel ? `Continue as ${selectedLabel}` : "Continue"} <span>→</span></button> : <button type="button" className="apply-primary" onClick={() => void submitApplication()} disabled={submitting}>{submitting ? "Submitting…" : "Submit Application"} <span>↗</span></button>}</div>
     </section>
     <p className="apply-availability-note">ROVA is preparing for launch. Services are not currently available to book. Vehicle access is subject to qualification, availability and partner approval.</p>
     <ApplyFooter />

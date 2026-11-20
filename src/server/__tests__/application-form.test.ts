@@ -46,4 +46,17 @@ describe("application form API compatibility", () => {
     expect((await POST(request({ ...base, data: { region: "not a region" } }))).status).toBe(400);
     expect(mocks.createApplication).not.toHaveBeenCalled();
   });
+
+  it("accepts Restaurant through the existing merchant form", async () => {
+    const data = Object.fromEntries(applicationFields.MERCHANT.map((field) => [
+      field.name,
+      field.name === "businessCategory" ? "Restaurant" : field.kind === "select" ? field.options?.[0] : "Example",
+    ]));
+    const response = await POST(request({
+      type: "MERCHANT", firstName: "Test", lastName: "Applicant", phone: "0241234567", city: "Accra", consent: true, data,
+    }));
+
+    expect(response.status).toBe(201);
+    expect(mocks.createApplication).toHaveBeenCalledWith(expect.objectContaining({ type: "MERCHANT", data: expect.objectContaining({ businessCategory: "Restaurant" }) }));
+  });
 });
