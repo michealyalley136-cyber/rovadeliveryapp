@@ -31,6 +31,7 @@ export function Portal({ role, user }: { role: AppRole; user: { name: string } |
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [dashboardError, setDashboardError] = useState("");
   const [pickup, setPickup] = useState("Osu Oxford Street, Accra");
   const [destination, setDestination] = useState("");
   const [service, setService] = useState<"RIDE" | "TAXI">("RIDE");
@@ -44,7 +45,9 @@ export function Portal({ role, user }: { role: AppRole; user: { name: string } |
       return;
     }
     const payload = await response.json();
-    if (response.ok) setData(payload);
+    if (!response.ok) throw new Error(payload.error ?? "Unable to load dashboard data.");
+    setData(payload);
+    setDashboardError("");
   }, [router]);
 
   useEffect(() => {
@@ -59,9 +62,13 @@ export function Portal({ role, user }: { role: AppRole; user: { name: string } |
           return;
         }
         const payload = await response.json();
-        if (active && response.ok) setData(payload);
+        if (!response.ok) throw new Error(payload.error ?? "Unable to load dashboard data.");
+        if (active) {
+          setData(payload);
+          setDashboardError("");
+        }
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : "Unable to load dashboard data.");
+        if (active) setDashboardError(reason instanceof Error ? reason.message : "Unable to load dashboard data.");
       }
     };
     void load();
@@ -128,10 +135,12 @@ export function Portal({ role, user }: { role: AppRole; user: { name: string } |
         <div className="portal-content">
           <div className="portal-title-row"><div><div className="eyebrow dark-eyebrow">{role === "OPERATIONS" ? "COMMAND CENTER" : role === "OPERATOR" ? "YOUR ROVA DAY" : "ROVA GHANA · DEMO"}</div><h1>{content.title}</h1><p>{content.subtitle}</p></div><span className="demo-label">DEMO WORKSPACE</span></div>
           {error && <div className="alert alert-error" role="alert">{error}</div>}
+          {dashboardError && <div className="alert alert-error" role="alert">{dashboardError} {data && "Displayed dashboard data may be out of date."}</div>}
           {message && <div className="alert alert-success" role="status">{message}</div>}
-          {role === "CUSTOMER" && <CustomerView data={data} pickup={pickup} setPickup={setPickup} destination={destination} setDestination={setDestination} service={service} setService={setService} fare={fare} busy={busy} onRequest={() => void perform("/api/rides", "POST", { pickup, destination, service })} />}
-          {role === "OPERATOR" && <OperatorView data={data} busy={busy} onAvailability={(online) => void perform("/api/operator/availability", "POST", { online })} onAction={(tripId, action) => void perform(`/api/rides/${tripId}/action`, "POST", { action })} />}
-          {role === "OPERATIONS" && <OperationsView data={data} />}
+          {!data && !dashboardError && <p role="status">Loading dashboard data…</p>}
+          {data && role === "CUSTOMER" && <CustomerView data={data} pickup={pickup} setPickup={setPickup} destination={destination} setDestination={setDestination} service={service} setService={setService} fare={fare} busy={busy} onRequest={() => void perform("/api/rides", "POST", { pickup, destination, service })} />}
+          {data && role === "OPERATOR" && <OperatorView data={data} busy={busy} onAvailability={(online) => void perform("/api/operator/availability", "POST", { online })} onAction={(tripId, action) => void perform(`/api/rides/${tripId}/action`, "POST", { action })} />}
+          {data && role === "OPERATIONS" && <OperationsView data={data} />}
           <footer className="portal-footer"><span>ROVA GHANA · PILOT ENVIRONMENT</span><span>Move forward, together.</span></footer>
         </div>
       </section>
