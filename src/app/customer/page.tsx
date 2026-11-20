@@ -2,7 +2,7 @@ import { Portal } from "@/components/portal";
 import { CustomerDashboard } from "@/components/customer-dashboard";
 import { getSession } from "@/server/auth";
 import { getHeritageRotation } from "@/server/heritage-settings";
-import { defaultIntervalMinutes } from "@/config/heritage-rotation";
+import { defaultIntervalSeconds, heritageArtwork } from "@/config/heritage-rotation";
 import "./customer-dashboard.css";
 
 export default async function CustomerPage() {
@@ -13,7 +13,7 @@ export default async function CustomerPage() {
     rotation = await getHeritageRotation();
   } catch (error) {
     console.error("ROVA heritage settings unavailable", error);
-    rotation = { intervalMinutes: defaultIntervalMinutes, artworks: [] };
+    rotation = { intervalSeconds: defaultIntervalSeconds, artworks: heritageArtwork };
   }
   return <CustomerDashboard user={session} rotation={rotation} />;
 }

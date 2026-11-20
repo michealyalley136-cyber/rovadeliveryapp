@@ -1,7 +1,7 @@
 import "server-only";
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { defaultIntervalMinutes, heritageArtwork, type HeritageRotation } from "@/config/heritage-rotation";
+import { defaultIntervalSeconds, heritageArtwork, type HeritageRotation } from "@/config/heritage-rotation";
 import { getDatabase } from "@/server/db";
 
 export async function getHeritageRotation(): Promise<HeritageRotation> {
@@ -16,5 +16,5 @@ export async function getHeritageRotation(): Promise<HeritageRotation> {
       return null;
     }
   }));
-  return { intervalMinutes: settings?.intervalMinutes ?? defaultIntervalMinutes, artworks: artworks.filter((art) => art !== null) };
+  return { intervalSeconds: settings ? settings.intervalSeconds ?? settings.intervalMinutes * 60 : defaultIntervalSeconds, artworks: artworks.filter((art) => art !== null) };
 }

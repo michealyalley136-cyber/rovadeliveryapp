@@ -54,8 +54,8 @@ export function HeritageBackground({ rotation }: { rotation: HeritageRotation })
     function schedule() {
       if (loading) { loading.onload = null; loading.onerror = null; }
       const now = Date.now();
-      const current = available[rotationIndex(now, settings.intervalMinutes, available.length)];
-      const next = available[rotationIndex(nextRotationTime(now, settings.intervalMinutes), settings.intervalMinutes, available.length)];
+      const current = available[rotationIndex(now, settings.intervalSeconds, available.length)];
+      const next = available[rotationIndex(nextRotationTime(now, settings.intervalSeconds), settings.intervalSeconds, available.length)];
       loading = new window.Image();
       loading.onload = () => {
         if (!active) return;
@@ -79,8 +79,8 @@ export function HeritageBackground({ rotation }: { rotation: HeritageRotation })
         }
       };
       loading.src = current.image;
-      const delay = Math.max(0, nextRotationTime(now, settings.intervalMinutes) - now);
-      if (next.id !== current.id) preloadTimer = window.setTimeout(() => { const image = new window.Image(); image.src = next.image; }, Math.max(0, delay - 30000));
+      const delay = Math.max(0, nextRotationTime(now, settings.intervalSeconds) - now);
+      if (next.id !== current.id) preloadTimer = window.setTimeout(() => { const image = new window.Image(); image.src = next.image; }, Math.max(0, delay - Math.min(5000, settings.intervalSeconds * 250)));
       timer = window.setTimeout(schedule, delay + 10);
     }
 

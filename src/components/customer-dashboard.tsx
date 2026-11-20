@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { customerServices, greeting } from "@/config/customer-services";
 import { ghanaRegions, localDateAndHour, type GhanaRegion } from "@/config/heritage";
@@ -48,7 +48,6 @@ function Icon({ name }: { name: string }) {
     Safety: "M12 2 21 5v6c0 5-3.5 8.5-9 11-5.5-2.5-9-6-9-11V5zM8 12l3 3 5-6",
     Account: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10",
     pin: "M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0zM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
-    search: "M21 21l-4.5-4.5M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z",
     bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
   };
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name] ?? paths.pin} /></svg>;
@@ -61,14 +60,10 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
   const [location, setLocation] = useState("");
   const [region, setRegion] = useState<GhanaRegion | "">("");
   const [locationError, setLocationError] = useState("");
-  const [booking, setBooking] = useState<RideService | null>(null);
-  const [pickup, setPickup] = useState("");
-  const [destination, setDestination] = useState("");
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [error, setError] = useState("");
   const [dashboardError, setDashboardError] = useState("");
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
   const [placeLabel, setPlaceLabel] = useState("Home");
   const [placeAddress, setPlaceAddress] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -76,19 +71,6 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
   const clock = useSyncExternalStore(subscribeClock, () => { const { date, hour } = localDateAndHour(new Date()); return `${date}|${hour}`; }, () => "2000-01-01|12");
   const [, hourText] = clock.split("|");
   const hour = Number(hourText);
-
-  const refresh = useCallback(async () => {
-    try {
-      const response = await fetch("/api/dashboard", { cache: "no-store" });
-      if (response.status === 401) { router.refresh(); return; }
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Could not load demo activity.");
-      setTrips(result.trips);
-      setDashboardError("");
-    } catch (reason) {
-      setDashboardError(reason instanceof Error ? reason.message : "Could not load demo activity.");
-    }
-  }, [router]);
 
   useEffect(() => {
     let active = true;
@@ -115,7 +97,6 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
       ({ coords }) => {
         const value = `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
         setLocation(value);
-        setPickup(value);
         setLocationOpen(false);
       },
       () => setLocationError("Could not access your location. Enter a location instead."),
@@ -132,21 +113,6 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
     } catch { setError("Could not save places on this device. Check your browser storage settings."); return false; }
   }
 
-  async function requestRide(event: React.FormEvent) {
-    event.preventDefault();
-    if (!booking) return;
-    setBusy(true); setError(""); setMessage("");
-    try {
-      const response = await fetch("/api/rides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pickup, destination, service: booking }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Could not create the demo ride.");
-      setBooking(null);
-      setMessage("Demo ride created. No real driver or payment is involved.");
-      await refresh();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not create the demo ride."); }
-    finally { setBusy(false); }
-  }
-
   async function signOut() {
     try {
       const response = await fetch("/api/session", { method: "DELETE" });
@@ -157,12 +123,15 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
 
   const active = trips?.find((trip) => !["TRIP_COMPLETED", "CANCELLED"].includes(trip.status));
   const openBooking = (service: RideService, address?: string) => {
-    setSection("Home"); setBooking(service);
-    if (address) setDestination(address);
-    if (location && !pickup) setPickup(location);
+    try {
+      sessionStorage.setItem("rova-demo-booking", JSON.stringify({ pickup: location, destination: address ?? "" }));
+      router.push(service === "RIDE" ? "/customer/motorcycle" : "/customer/cab");
+    } catch {
+      setError("Could not open booking on this device. Check your browser storage settings.");
+    }
   };
   const navigation = (label: string) => <nav aria-label={label}>{nav.map((item) =>
-    <button type="button" className={section === item ? "selected" : ""} aria-current={section === item ? "page" : undefined} onClick={() => { setSection(item); setBooking(null); }} key={item}><Icon name={item} /><span>{item}</span></button>)}</nav>;
+    <button type="button" className={section === item ? "selected" : ""} aria-current={section === item ? "page" : undefined} onClick={() => setSection(item)} key={item}><Icon name={item} /><span>{item}</span></button>)}</nav>;
 
   return <main className="customer-app">
     <aside className="customer-sidebar">
@@ -179,7 +148,7 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
           <strong>Your location</strong><p>Use your coordinates or enter a location manually.</p>
           <label htmlFor="customer-region">Region (optional)</label><select id="customer-region" value={region} onChange={(event) => setRegion(ghanaRegions.find((item) => item === event.target.value) ?? "")}><option value="">Select a region</option>{ghanaRegions.map((item) => <option key={item} value={item}>{item}</option>)}</select>
           <button type="button" onClick={useLocation}>Use current location</button>
-          <form onSubmit={(event) => { event.preventDefault(); setPickup(location); setLocationOpen(false); }}><label htmlFor="customer-location">Location</label><input id="customer-location" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Enter your area or address" required /><button type="submit">Set location</button></form>
+          <form onSubmit={(event) => { event.preventDefault(); setLocationOpen(false); }}><label htmlFor="customer-location">Location</label><input id="customer-location" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Enter your area or address" required /><button type="submit">Set location</button></form>
           {locationError && <p role="alert">{locationError}</p>}
         </div>}
       </header>
@@ -193,16 +162,11 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
             <HeritageBackground rotation={rotation} />
             <div className="customer-welcome-copy"><p>{greeting(hour)}, {user.name.trim().split(/\s+/)[0]}!</p><h1>What would you like<br />to do today?</h1><span>Wherever life takes you, ROVA is with you.</span></div>
           </section>
-          <button className="customer-search" onClick={() => openBooking("RIDE")}><Icon name="search" /><span>Where to?</span><span aria-hidden="true">→</span></button>
-          {booking && <section className="customer-panel customer-booking" aria-labelledby="booking-title"><div className="customer-section-heading"><div><span className="customer-kicker">DEMO JOURNEY</span><h2 id="booking-title">{booking === "RIDE" ? "Book a Motorcycle" : "Book a Cab"}</h2></div><button onClick={() => setBooking(null)} aria-label="Close booking">×</button></div>
-            <p>This creates a simulated ride only. Address search, maps and live dispatch are not available.</p>
-            <form onSubmit={requestRide}><label>Pickup location<input value={pickup} onChange={(event) => setPickup(event.target.value)} placeholder="Enter pickup" minLength={3} maxLength={120} required /></label><label>Destination<input value={destination} onChange={(event) => setDestination(event.target.value)} placeholder="Enter destination" minLength={3} maxLength={120} required /></label><button className="customer-primary" disabled={busy}>{busy ? "Creating…" : "Create demo ride"}</button></form>
-          </section>}
           {active && <section className="customer-active"><div><span className="customer-kicker">ACTIVE DEMO RIDE</span><h2>{active.destination}</h2><p>{active.status.replaceAll("_", " ").toLowerCase()} · from {active.pickup}</p></div><button onClick={() => setSection("Activity")}>View activity →</button></section>}
-          <div className="customer-section-heading"><div><span className="customer-kicker">EXPLORE ROVA</span><h2>What can we help you with?</h2></div></div>
+          <div className="customer-section-heading customer-explore-heading"><div><span className="customer-kicker">EXPLORE ROVA</span><h2>What can we help you with?</h2></div></div>
           <div className="customer-services">{customerServices.map((service) => <button type="button" className={`customer-service ${service.color}`} key={service.id} onClick={() => service.id === "RIDE" || service.id === "TAXI" ? openBooking(service.id) : setMessage(`${service.title} is coming soon and is not available for bookings.`)}>
             <div className="customer-service-image"><Image src={service.image} alt="" width={376} height={270} sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 360px" /></div>
-            <div className="customer-service-copy"><span className="customer-service-status">{service.demo ? "DEMO" : "COMING SOON"}</span><h3>{service.title}</h3><p>{service.description}</p><span className="customer-service-arrow" aria-hidden="true">↗</span></div>
+            <div className="customer-service-copy"><span className="customer-service-status">{service.demo ? "DEMO" : "COMING SOON"}</span><h3>{service.title}</h3><p>{service.description}</p></div>
           </button>)}</div>
           <button className="customer-safety" onClick={() => setSection("Safety")}><span className="customer-safety-icon"><Icon name="Safety" /></span><span><small>ROVA SAFETY</small><strong>Your safety comes first.</strong><span>Explore our plans for safer journeys.</span></span><b aria-hidden="true">→</b></button>
           <SavedDestinations places={places} setEditing={setEditing} setPlaceLabel={setPlaceLabel} setPlaceAddress={setPlaceAddress} select={(address) => openBooking("RIDE", address)} remove={(id) => savePlaces(places.filter((place) => place.id !== id))} editing={editing} placeLabel={placeLabel} placeAddress={placeAddress} save={(event) => { event.preventDefault(); const place = { id: editing ?? crypto.randomUUID(), label: placeLabel.trim(), address: placeAddress.trim() }; if (savePlaces(editing ? places.map((old) => old.id === editing ? place : old) : [...places, place])) { setEditing(null); setPlaceLabel("Home"); setPlaceAddress(""); } }} />

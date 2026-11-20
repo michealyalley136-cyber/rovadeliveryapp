@@ -16,16 +16,24 @@ describe("heritage admin authorization", () => {
     for (const role of [null, { role: "VIEW_ONLY" }, { role: "RECRUITMENT_AGENT" }]) {
       mocks.authorize.mockResolvedValue(role);
       expect((await GET()).status).toBe(403);
-      expect((await PUT(request({ intervalMinutes: 180, disabledIds: [] }))).status).toBe(403);
+      expect((await PUT(request({ intervalSeconds: 60, disabledIds: [] }))).status).toBe(403);
     }
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
   it("accepts authorized updates and rejects invalid settings and cross-origin requests", async () => {
     mocks.authorize.mockResolvedValue({ role: "OPERATIONS_ADMIN" });
-    expect((await PUT(request({ intervalMinutes: 0, disabledIds: [] }))).status).toBe(400);
-    expect((await PUT(request({ intervalMinutes: 180, disabledIds: ["unknown"] }))).status).toBe(400);
-    expect((await PUT(request({ intervalMinutes: 180, disabledIds: [] }, "https://other.example"))).status).toBe(403);
-    expect((await PUT(request({ intervalMinutes: 60, disabledIds: ["arch"] }))).status).toBe(200);
-    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { intervalMinutes: 60, disabledIds: ["arch"] } }));
+    mocks.findUnique.mockResolvedValue({ intervalMinutes: 180, intervalSeconds: null, disabledIds: [] });
+    expect((await PUT(request({ intervalSeconds: 0, disabledIds: [] }))).status).toBe(400);
+    expect((await PUT(request({ intervalSeconds: 60, disabledIds: ["unknown"] }))).status).toBe(400);
+    expect((await PUT(request({ intervalSeconds: 60, disabledIds: [] }, "https://other.example"))).status).toBe(403);
+    expect((await PUT(request({ intervalSeconds: 42, disabledIds: [] }))).status).toBe(400);
+    expect((await PUT(request({ intervalSeconds: 60, disabledIds: ["arch"] }))).status).toBe(200);
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { intervalSeconds: 60, disabledIds: ["arch"] } }));
+  });
+  it("preserves an existing custom minute interval until an administrator changes it", async () => {
+    mocks.authorize.mockResolvedValue({ role: "SUPER_ADMIN" });
+    mocks.findUnique.mockResolvedValue({ intervalMinutes: 7, intervalSeconds: null, disabledIds: [] });
+    expect((await (await GET()).json()).intervalSeconds).toBe(420);
+    expect((await PUT(request({ intervalSeconds: 420, disabledIds: ["arch"] }))).status).toBe(200);
   });
 });

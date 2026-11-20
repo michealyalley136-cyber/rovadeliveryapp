@@ -9,6 +9,7 @@ datasource db {
 model HeritageSettings {
   id              String   @id
   intervalMinutes Int      @default(180)
+  intervalSeconds Int?
   disabledIds     String[] @default([])
   updatedAt       DateTime @updatedAt
 }
