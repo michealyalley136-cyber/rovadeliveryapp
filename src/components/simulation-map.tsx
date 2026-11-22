@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { type GeoJSONSource } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import type { GeoJSONSource } from "maplibre-gl";
 import type { SimulationRide } from "@/lib/ride-simulation";
 import { radiusFor, searchElapsed } from "@/lib/ride-simulation";
 import { SimulatedDriverLocationProvider, syntheticPickup, syntheticRoads } from "@/lib/simulated-driver-location";
@@ -66,6 +67,7 @@ export function SimulationMap({ ride, now }: { ride: SimulationRide; now: number
     if (!container.current) return;
     let map: maplibregl.Map;
     try {
+      maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
       map = new maplibregl.Map({ container: container.current, center: [-0.177, 5.610], zoom: 12, attributionControl: false, style: { version: 8, sources: {}, layers: [{ id: "background", type: "background", paint: { "background-color": "#e9f2e7" } }] } });
     } catch (reason) {
       console.error("Simulation map unavailable", reason);
