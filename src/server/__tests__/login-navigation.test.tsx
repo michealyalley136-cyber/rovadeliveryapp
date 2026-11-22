@@ -30,6 +30,8 @@ describe("login navigation", () => {
     expect(markup).toContain('type="password"');
     expect(markup).toContain('type="button"');
     expect(markup).toContain('href="/application-status"');
+    expect(markup).toContain("Already applied? Check application status");
+    expect(markup).toContain("Secure identity verification is required");
     expect(markup).toContain('href="/admin"');
     expect(markup).toContain('href="/apply"');
     expect(markup).toContain('href="#password-help"');

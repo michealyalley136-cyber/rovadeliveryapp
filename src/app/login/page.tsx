@@ -32,7 +32,8 @@ export default function LoginPage() {
           <p id="password-help"><strong>Password recovery</strong> will be available when account sign-in launches.</p>
           <p><strong>Account creation</strong> is not available yet. An application is not an account.</p>
         </div>
-        <Link className={styles.status} href="/application-status">Check application status <span aria-hidden="true">→</span></Link>
+        <Link className={styles.status} href="/application-status">Already applied? Check application status <span aria-hidden="true">→</span></Link>
+        <p className={styles.recovery}>Using another device does not restore browser recognition. Secure identity verification is required before account access can be linked.</p>
         <div className={styles.staff}><Link href="/admin">Staff login</Link></div>
       </section>
     </main>

@@ -41,4 +41,6 @@ After a successful database transaction, application submission sets a 90-day si
 
 Applicants from before this feature, or those returning on another device or after clearing cookies, can still use the existing application-status lookup and must not be required to submit a duplicate application. Secure recognition recovery is not implemented: design an independently verified, rate-limited ownership challenge or a verified account-linking process before issuing a marker on another device. Reference and contact details alone must not issue recognition or grant access.
 
+The login page labels the existing status route as "Already applied? Check application status" and explicitly states that a different device does not restore recognition. That lookup remains a read-only status check, not a recovery or identity-proof mechanism. An approved OTP/identity-verification or verified account-linking service is required before cross-device recovery can be implemented; no fake verification flow is included.
+
 The application wizard keeps answers only in component memory while the form is open. It removes the legacy `rova-application-draft` local-storage key when the page loads and does not create replacement browser-persisted drafts, so applicant details are not stored in local storage. The recognition feature itself also does not use local storage.

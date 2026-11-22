@@ -47,6 +47,7 @@
 .help { margin-top: 22px; color: #435163; font-size: 13px; line-height: 1.6; }
 .help p { margin-bottom: 10px; scroll-margin-top: 20px; }
 .status { display: inline-flex; gap: 8px; align-items: center; margin-top: 12px; font-weight: 700; }
+.recovery { margin-top: 12px; color: #435163; font-size: 12px; line-height: 1.6; }
 .staff { margin-top: 28px; padding-top: 20px; border-top: 1px solid #e6eaec; font-size: 12px; color: #536171; }
 .staff a { text-decoration: underline; text-underline-offset: 3px; }
 .content a:hover { color: #81601b; }
