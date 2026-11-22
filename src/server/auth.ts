@@ -6,6 +6,7 @@ import { isDemoMode } from "@/server/demo-store";
 
 const cookieName = "rova_demo_session";
 const adminCookieName = "rova_admin_session";
+type SessionKind = "demo" | "admin";
 
 function signingKey() {
   const secret = process.env.AUTH_SECRET;
@@ -16,11 +17,41 @@ function signingKey() {
   return new TextEncoder().encode(secret);
 }
 
+function authIssuer() {
+  const isLocalRuntime = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  const environment = process.env.ROVA_AUTH_ENVIRONMENT ?? (isLocalRuntime ? "local" : undefined);
+  if (
+    (environment !== "local" && environment !== "staging" && environment !== "production") ||
+    (!isLocalRuntime && environment === "local")
+  ) {
+    throw new Error("ROVA_AUTH_ENVIRONMENT must identify this deployment as staging or production.");
+  }
+
+  return `urn:rova:auth:${environment}`;
+}
+
+function sessionAudience(issuer: string, kind: SessionKind) {
+  return `${issuer}/${kind}`;
+}
+
+function verificationOptions(kind: SessionKind) {
+  const issuer = authIssuer();
+  return {
+    algorithms: ["HS256"],
+    issuer,
+    audience: sessionAudience(issuer, kind),
+    requiredClaims: ["iss", "aud", "iat", "exp", "sub", "kind"],
+  };
+}
+
 export async function createDemoSession(role: AppRole) {
   if (!isDemoMode()) throw new Error("Demo sign-in is disabled.");
   const user = demoUsers[role];
-  const token = await new SignJWT({ role: user.role, name: user.name })
+  const issuer = authIssuer();
+  const token = await new SignJWT({ role: user.role, name: user.name, kind: "demo" })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(issuer)
+    .setAudience(sessionAudience(issuer, "demo"))
     .setSubject(user.id)
     .setIssuedAt()
     .setExpirationTime("8h")
@@ -42,8 +73,11 @@ export async function clearSession() {
 }
 
 export async function createAdminSession(user: { id: string; role: AdminRole; name: string }) {
+  const issuer = authIssuer();
   const token = await new SignJWT({ role: user.role, name: user.name, kind: "admin" })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(issuer)
+    .setAudience(sessionAudience(issuer, "admin"))
     .setSubject(user.id)
     .setIssuedAt()
     .setExpirationTime("4h")
@@ -66,9 +100,15 @@ export async function getAdminSession(): Promise<{ id: string; role: AdminRole; 
   const token = (await cookies()).get(adminCookieName)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, signingKey());
+    const { payload } = await jwtVerify(token, signingKey(), verificationOptions("admin"));
     const role = payload.role;
-    if (payload.kind !== "admin" || typeof role !== "string" || !adminRoles.includes(role as AdminRole) || !payload.sub || typeof payload.name !== "string") return null;
+    if (
+      payload.kind !== "admin" ||
+      typeof role !== "string" ||
+      !adminRoles.includes(role as AdminRole) ||
+      typeof payload.sub !== "string" ||
+      typeof payload.name !== "string"
+    ) return null;
     return { id: payload.sub, role: role as AdminRole, name: payload.name };
   } catch {
     return null;
@@ -79,10 +119,16 @@ export async function getSession(): Promise<DemoUser | null> {
   const token = (await cookies()).get(cookieName)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, signingKey());
+    const { payload } = await jwtVerify(token, signingKey(), verificationOptions("demo"));
     const role = payload.role;
-    if (typeof role !== "string" || !(role in demoUsers)) return null;
-    return { id: payload.sub!, role: role as AppRole, name: demoUsers[role as AppRole].name };
+    if (
+      payload.kind !== "demo" ||
+      typeof role !== "string" ||
+      !Object.hasOwn(demoUsers, role) ||
+      typeof payload.sub !== "string" ||
+      typeof payload.name !== "string"
+    ) return null;
+    return { id: payload.sub, role: role as AppRole, name: demoUsers[role as AppRole].name };
   } catch {
     return null;
   }

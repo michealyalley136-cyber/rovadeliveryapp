@@ -6,6 +6,7 @@ Copy `.env.example` to `.env.local` for local work.
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection used by the Prisma application/admin repositories |
 | `AUTH_SECRET` | Random session-signing key (minimum 32 characters) |
+| `ROVA_AUTH_ENVIRONMENT` | Server-only JWT identity: `staging` or `production` when deployed; optional locally |
 | `APPLICATIONS_ENABLED` | Global application intake switch (defaults to enabled) |
 | `CUSTOMER_APPLICATIONS_ENABLED` | Customer pre-launch registration intake switch |
 | `RIDER_APPLICATIONS_ENABLED` | Motorcycle rider application intake switch |
@@ -23,3 +24,5 @@ Copy `.env.example` to `.env.local` for local work.
 Set deployment-specific variables in the hosting provider's secret manager. Do not commit credentials or applicant information. Admin provisioning reads `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD`, and optional `ADMIN_ROLE` from the process environment; keep the password out of shell history and logs. See the [README](./README.md) for the setup steps.
 
 Deploy the additive Prisma migration with `npx prisma migrate deploy` before enabling a version that accepts customer registrations. It does not activate customer ride services.
+
+Set `ROVA_AUTH_ENVIRONMENT=staging` in staging and `ROVA_AUTH_ENVIRONMENT=production` in production. The issuer is a server-side environment identity (`urn:rova:auth:staging` or `urn:rova:auth:production`); deployed authentication fails closed if the setting is absent or invalid. `NEXT_PUBLIC_SITE_URL` remains the canonical public-site URL and is not used to determine JWT trust.
