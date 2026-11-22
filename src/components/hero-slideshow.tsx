@@ -8,7 +8,7 @@ import { getEnabledSlides, getNextSlideIndex, getPreviousSlideIndex, heroSlides 
 
 const enabledSlides = getEnabledSlides(heroSlides);
 
-export function HeroSlideshow() {
+export function HeroSlideshow({ showLogin = false }: { showLogin?: boolean }) {
   const [active, setActive] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -107,6 +107,7 @@ export function HeroSlideshow() {
         <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-controls="campaign-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span /><span /></button>
         <nav id="campaign-navigation" className={menuOpen ? "campaign-links menu-open" : "campaign-links"} aria-label="Main navigation">
           <Link href="/application-status" onClick={() => setMenuOpen(false)}>Application status</Link>
+          {showLogin && <Link href="/login" onClick={() => setMenuOpen(false)}>Login</Link>}
           <Link className="nav-apply" href="/apply" onClick={() => setMenuOpen(false)}>Apply now <span>↗</span></Link>
         </nav>
       </header>

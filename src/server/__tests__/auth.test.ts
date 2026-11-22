@@ -7,6 +7,7 @@ import {
   getSession,
   requireRole,
 } from "../auth";
+import { createApplicationRecognition } from "../application-recognition";
 
 const cookieStore = vi.hoisted(() => {
   const values = new Map<string, string>();
@@ -99,6 +100,14 @@ afterEach(() => {
 });
 
 describe("environment-bound JWT sessions", () => {
+  it("does not accept an application recognition marker as an authenticated session", async () => {
+    const marker = await createApplicationRecognition();
+    setCookie("rova_demo_session", marker);
+    setCookie("rova_admin_session", marker);
+    expect(await getSession()).toBeNull();
+    expect(await getAdminSession()).toBeNull();
+  });
+
   it("accepts a valid staging demo token in staging", async () => {
     await createDemoSession("CUSTOMER");
 

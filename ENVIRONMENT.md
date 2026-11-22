@@ -5,7 +5,7 @@ Copy `.env.example` to `.env.local` for local work.
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection used by the Prisma application/admin repositories |
-| `AUTH_SECRET` | Random session-signing key (minimum 32 characters) |
+| `AUTH_SECRET` | Random session-signing key (minimum 32 characters); also used to derive a separate application-recognition signing key |
 | `ROVA_AUTH_ENVIRONMENT` | Server-only JWT identity: `staging` or `production` when deployed; optional locally |
 | `APPLICATIONS_ENABLED` | Global application intake switch (defaults to enabled) |
 | `CUSTOMER_APPLICATIONS_ENABLED` | Customer pre-launch registration intake switch |
@@ -22,6 +22,8 @@ Copy `.env.example` to `.env.local` for local work.
 | `ROVA_DEMO_MODE` | Legacy isolated demo setting; never use for real customer accounts |
 
 Set deployment-specific variables in the hosting provider's secret manager. Do not commit credentials or applicant information. Admin provisioning reads `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD`, and optional `ADMIN_ROLE` from the process environment; keep the password out of shell history and logs. See the [README](./README.md) for the setup steps.
+
+Application submission requires `AUTH_SECRET` and a valid `ROVA_AUTH_ENVIRONMENT` in deployed environments. The server validates recognition signing configuration before saving an application; an invalid configuration makes submission temporarily unavailable rather than saving without a recognition marker. Local development also needs a securely supplied `AUTH_SECRET` of at least 32 characters to submit applications. Do not use production secrets locally.
 
 Deploy the additive Prisma migration with `npx prisma migrate deploy` before enabling a version that accepts customer registrations. It does not activate customer ride services.
 

@@ -6,14 +6,12 @@ import { ApplicationOptionCarousel, visualOptions, type VisualOption } from "@/c
 import {
   applicationFields,
   applicationTypeOptions,
-  isApplicationType,
   sharedApplicationFields,
   type ApplicationField,
   type ApplicationType,
 } from "@/config/application-types";
 
 type Answers = Record<string, string>;
-type Draft = { version: 2; type: ApplicationType | null; step: number; answers: Answers; selectedId: string | null };
 
 const steps = ["Opportunity", "About You", "Location & Experience", "Vehicle / Business Details", "Goals & Availability", "Review & Submit"];
 const customerSteps = ["Opportunity", "About You", "Location & Interests", "ROVA Services", "Preferences", "Review & Submit"];
@@ -61,7 +59,6 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
-  const [saveDraft, setSaveDraft] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(step);
   const visibleOptions = useMemo(() => visualOptions.filter((item) => !enabledTypes || enabledTypes.includes(item.type)), [enabledTypes]);
@@ -71,19 +68,16 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
   const stepTitles = type === "CUSTOMER" ? customerSteps : steps;
 
   useEffect(() => {
-    const onDraftError = () => setDraftMessage("This browser could not save a local draft. Continue to submit when ready.");
-    window.addEventListener("rova-draft-storage-error", onDraftError);
-    return () => window.removeEventListener("rova-draft-storage-error", onDraftError);
-  }, []);
-
-  useEffect(() => {
-    if (!saveDraft || submitted) return;
+    let active = true;
     try {
-      localStorage.setItem("rova-application-draft", JSON.stringify({ version: 2, type, step, answers, selectedId } satisfies Draft));
+      localStorage.removeItem("rova-application-draft");
     } catch {
-      window.dispatchEvent(new Event("rova-draft-storage-error"));
+      queueMicrotask(() => {
+        if (active) setDraftMessage("A previously saved application draft could not be removed from this browser. Clear this site's browser data if the draft may contain personal information.");
+      });
     }
-  }, [answers, saveDraft, selectedId, step, submitted, type]);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (previousStep.current !== step) {
@@ -92,40 +86,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
     }
   }, [step]);
 
-  function resumeDraft() {
-    try {
-      const saved = localStorage.getItem("rova-application-draft");
-      if (!saved) {
-        setDraftMessage("No saved draft was found on this device.");
-        return;
-      }
-      const draft: unknown = JSON.parse(saved);
-      if (!draft || typeof draft !== "object" || !("answers" in draft) || !draft.answers || typeof draft.answers !== "object" || Array.isArray(draft.answers)) throw new Error("Invalid draft");
-      const savedAnswers = Object.fromEntries(Object.entries(draft.answers).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-      const savedType = "type" in draft && isApplicationType(typeof draft.type === "string" ? draft.type : null) ? draft.type as ApplicationType : null;
-      if (savedType && enabledTypes && !enabledTypes.includes(savedType)) {
-        setDraftMessage("The opportunity in this draft is currently paused.");
-        return;
-      }
-      const oldStep = "step" in draft && typeof draft.step === "number" && Number.isInteger(draft.step) ? draft.step : 0;
-      const savedStep = "version" in draft && draft.version === 2 ? oldStep : [0, 1, 3, 5][Math.min(Math.max(oldStep, 0), 3)];
-      setType(savedType);
-      const savedVisual = "selectedId" in draft ? visualOptions.find((item) => item.id === draft.selectedId && item.type === savedType) : undefined;
-      setSelectedId(savedVisual?.id ?? selectedVisualId(savedType, savedAnswers));
-      setStep(savedType ? Math.min(Math.max(savedStep, 0), 5) : 0);
-      setAnswers(savedAnswers);
-      setConsent(false);
-      setErrors({});
-      setError("");
-      setSaveDraft(true);
-      setDraftMessage("Your locally saved draft is ready to continue.");
-    } catch {
-      setDraftMessage("The saved draft could not be opened.");
-    }
-  }
-
   function updateAnswer(name: string, value: string) {
-    setSaveDraft(true);
     setAnswers((current) => ({ ...current, [name]: value }));
     setErrors((current) => {
       const next = { ...current };
@@ -148,7 +109,6 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
     }
     setType(nextType);
     setSelectedId(visual?.id ?? null);
-    setSaveDraft(true);
     setError("");
     setErrors({});
   }
@@ -177,7 +137,6 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
       return;
     }
     setError("");
-    setSaveDraft(true);
     setStep((current) => Math.min(current + 1, 5));
   }
 
@@ -224,12 +183,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
       if (!response.ok) throw new Error(result.error ?? "We couldn’t submit your application.");
       setReference(typeof result.application?.reference === "string" ? result.application.reference : "");
       setSubmitted(true);
-      setSaveDraft(false);
-      try {
-        localStorage.removeItem("rova-application-draft");
-      } catch {
-        setDraftMessage("The application was submitted, but the local draft could not be removed from this browser.");
-      }
+      setDraftMessage("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "We couldn’t submit your application.");
     } finally {
@@ -241,7 +195,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
     return <main className="apply-page"><ApplyHeader /><section className="application-success"><div className="section-kicker">ROVA GHANA · PRE-LAUNCH</div><h1>Applications for this opportunity are currently paused.</h1><p>We’re preparing the ROVA network and will share updates as opportunities open.</p><Link className="apply-primary" href="/">Return to ROVA <span>↗</span></Link></section><ApplyFooter /></main>;
   }
   if (submitted) {
-    return <main className="apply-page"><ApplyHeader /><section className="application-success"><span className="success-icon" aria-hidden="true">✓</span><div className="section-kicker">ROVA GHANA · PRE-LAUNCH</div>{type === "CUSTOMER" ? <><h1>Registration Received</h1><p>Thank you for registering your interest in ROVA Ghana.</p><p>We&apos;ll use your information to keep you informed as ROVA services become available in your area.</p></> : <><h1>Application Received</h1><p>Thank you for your interest in joining the ROVA network. Your application has been received. Our Ghana operations team will review your information and contact you if additional information is required.</p><p>Submitting an application does not guarantee approval, employment or vehicle access.</p></>}{reference && <div className="reference-card"><small>APPLICATION REFERENCE</small><strong>{reference}</strong></div>}{draftMessage && <p role="status">{draftMessage}</p>}<div className="success-actions"><Link className="apply-primary" href="/application-status">Check Application Status <span>→</span></Link><Link className="wizard-back" href="/">Return to ROVA</Link></div></section><ApplyFooter /></main>;
+    return <main className="apply-page"><ApplyHeader /><section className="application-success"><span className="success-icon" aria-hidden="true">✓</span><div className="section-kicker">ROVA GHANA · PRE-LAUNCH</div>{type === "CUSTOMER" ? <><h1>Registration Received</h1><p>Thank you for registering your interest in ROVA Ghana.</p><p>We&apos;ll use your information to keep you informed as ROVA services become available in your area.</p></> : <><h1>Application Received</h1><p>Thank you for your interest in joining the ROVA network. Your application has been received. Our Ghana operations team will review your information and contact you if additional information is required.</p><p>Submitting an application does not guarantee approval, employment or vehicle access.</p></>}{reference && <div className="reference-card"><small>APPLICATION REFERENCE</small><strong>{reference}</strong></div>}{draftMessage && <p role="status">{draftMessage}</p>}<div className="success-actions"><Link className="apply-primary" href="/application-status">Check Application Status <span>→</span></Link><Link className="wizard-back" href="/" prefetch={false}>Return to ROVA</Link></div></section><ApplyFooter /></main>;
   }
 
   const descriptions = [
@@ -262,7 +216,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
       <ul className="apply-trust"><li>Secure application</li><li>Simple process</li><li>Ghana-focused support</li></ul></>}
     </section>
     <section className={`apply-shell ${step === 0 ? "apply-shell-selection" : ""}`} aria-labelledby="wizard-title">
-      <div className="wizard-heading"><div><span className="section-kicker">STEP {step + 1} OF {steps.length}</span><h2 id="wizard-title" ref={headingRef} tabIndex={-1}>{step === 0 ? "How would you like to join ROVA?" : stepTitles[step]}</h2>{step !== 0 && <p>{type === "CUSTOMER" && step === 2 ? "Tell us where you’re based." : type === "CUSTOMER" && step === 3 ? "Tell us which services interest you." : type === "CUSTOMER" && step === 4 ? "Tell us your preferences." : descriptions[step]}</p>}</div><button type="button" className="resume-draft" onClick={resumeDraft}>Resume a saved draft</button></div>
+      <div className="wizard-heading"><div><span className="section-kicker">STEP {step + 1} OF {steps.length}</span><h2 id="wizard-title" ref={headingRef} tabIndex={-1}>{step === 0 ? "How would you like to join ROVA?" : stepTitles[step]}</h2>{step !== 0 && <p>{type === "CUSTOMER" && step === 2 ? "Tell us where you’re based." : type === "CUSTOMER" && step === 3 ? "Tell us which services interest you." : type === "CUSTOMER" && step === 4 ? "Tell us your preferences." : descriptions[step]}</p>}</div></div>
       <div className="wizard-progress-wrap">
         <div className="wizard-progress-bar" role="progressbar" aria-label="Application progress" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={step + 1}><span style={{ width: `${((step + 1) / steps.length) * 100}%` }} /></div>
         <ol className="wizard-step-labels">{(type === "CUSTOMER" ? ["Opportunity", "About You", "Location", "Services", "Preferences", "Review"] : ["Opportunity", "About You", "Experience", "Details", "Goals", "Review"]).map((label, index) => <li key={label} aria-current={index === step ? "step" : undefined} className={index === step ? "active" : index < step ? "done" : ""}>{label}</li>)}</ol>
@@ -286,7 +240,7 @@ export function ApplyWizard({ initialType, applicationsEnabled, disabledType, en
       </div>
       {error && <p className="apply-error" role="alert">{error}</p>}
       {draftMessage && <p className="draft-message" role="status">{draftMessage}</p>}
-      <div className="wizard-actions"><div>{step > 0 ? <button type="button" className="wizard-back" onClick={() => { setStep((current) => current - 1); setError(""); setErrors({}); setSaveDraft(true); }}>← Back</button> : <Link className="wizard-back" href="/">← Back to ROVA</Link>}<span>Drafts stay in this browser until you submit.</span></div>{step < 5 ? <button type="button" className="apply-primary" disabled={step === 0 && !type} onClick={nextStep}>{step === 0 && selectedLabel ? `Continue as ${selectedLabel}` : "Continue"} <span>→</span></button> : <button type="button" className="apply-primary" onClick={() => void submitApplication()} disabled={submitting}>{submitting ? "Submitting…" : "Submit Application"} <span>↗</span></button>}</div>
+      <div className="wizard-actions"><div>{step > 0 ? <button type="button" className="wizard-back" onClick={() => { setStep((current) => current - 1); setError(""); setErrors({}); }}>← Back</button> : <Link className="wizard-back" href="/">← Back to ROVA</Link>}<span>Your answers are kept in this form until you leave or submit.</span></div>{step < 5 ? <button type="button" className="apply-primary" disabled={step === 0 && !type} onClick={nextStep}>{step === 0 && selectedLabel ? `Continue as ${selectedLabel}` : "Continue"} <span>→</span></button> : <button type="button" className="apply-primary" onClick={() => void submitApplication()} disabled={submitting}>{submitting ? "Submitting…" : "Submit Application"} <span>↗</span></button>}</div>
     </section>
     <p className="apply-availability-note">ROVA is preparing for launch. Services are not currently available to book. Vehicle access is subject to qualification, availability and partner approval.</p>
     <ApplyFooter />
@@ -303,7 +257,7 @@ function Field({ field, value, error, onChange }: { field: ApplicationField; val
 }
 
 function ApplyHeader() {
-  return <header className="apply-header"><Link className="apply-brand" href="/">ROVA<span>.</span></Link><span>GHANA · PRE-LAUNCH</span><Link href="/application-status">Check your status</Link></header>;
+  return <header className="apply-header"><Link className="apply-brand" href="/" prefetch={false}>ROVA<span>.</span></Link><span>GHANA · PRE-LAUNCH</span><Link href="/application-status">Check your status</Link></header>;
 }
 
 function ApplyFooter() {

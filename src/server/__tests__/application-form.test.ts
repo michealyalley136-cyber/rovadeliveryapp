@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applicationFields, applicationTypes, isApplicationType } from "../../config/application-types";
 
 const mocks = vi.hoisted(() => ({
@@ -10,8 +10,10 @@ vi.mock("@/server/feature-flags", () => ({ isApplicationEnabled: () => true }));
 vi.mock("@/server/rate-limit", () => ({ checkRateLimit: () => ({ allowed: true }) }));
 vi.mock("@/config/application-types", async () => import("../../config/application-types"));
 vi.mock("@/server/phone", async () => import("../phone"));
+vi.mock("server-only", () => ({}));
 
 import { POST } from "../../app/api/applications/route";
+import { isApplicationRecognized, recognitionCookieName, recognitionMaxAge } from "../application-recognition";
 
 function request(body: unknown) {
   return new Request("http://localhost/api/applications", {
@@ -23,9 +25,12 @@ function request(body: unknown) {
 
 describe("application form API compatibility", () => {
   beforeEach(() => {
+    vi.stubEnv("AUTH_SECRET", "test-only-recognition-secret-at-least-32-characters");
+    vi.stubEnv("ROVA_AUTH_ENVIRONMENT", "local");
     mocks.createApplication.mockReset();
     mocks.createApplication.mockResolvedValue({ reference: "ROVA-TEST-000001" });
   });
+  afterEach(() => vi.unstubAllEnvs());
 
   it.each(applicationTypes)("accepts existing required and optional questions for %s", async (type) => {
     const data = Object.fromEntries(applicationFields[type].map((field) => [
@@ -74,5 +79,39 @@ describe("application form API compatibility", () => {
     expect((await POST(request({ ...base, data: { serviceInterest: "Taxi rides" } }))).status).toBe(400);
     expect((await POST(request({ ...base, firstName: "", data: { serviceInterest: "Taxi rides", expectedUsage: "Daily" } }))).status).toBe(400);
     expect(mocks.createApplication).not.toHaveBeenCalled();
+  });
+
+  it("sets a non-identifying recognition cookie only after a saved application", async () => {
+    const body = { type: "CUSTOMER", firstName: "Test", lastName: "Applicant", phone: "0241234567", city: "Accra", consent: true, data: { serviceInterest: "Taxi rides", expectedUsage: "Daily" } };
+    const response = await POST(request(body));
+    const cookie = response.cookies.get(recognitionCookieName);
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ application: { reference: "ROVA-TEST-000001" } });
+    expect(cookie).toMatchObject({ httpOnly: true, sameSite: "lax", path: "/", maxAge: recognitionMaxAge });
+    expect(cookie?.value).not.toContain("ROVA-TEST-000001");
+    expect(await isApplicationRecognized(cookie?.value)).toBe(true);
+
+    mocks.createApplication.mockRejectedValueOnce(new Error("database unavailable"));
+    const failure = await POST(request(body));
+    expect(failure.status).toBe(503);
+    expect(failure.cookies.get(recognitionCookieName)).toBeUndefined();
+    const invalid = await POST(request({ ...body, consent: false }));
+    expect(invalid.status).toBe(400);
+    expect(invalid.cookies.get(recognitionCookieName)).toBeUndefined();
+  });
+
+  it("does not save an application when recognition signing is not configured", async () => {
+    vi.stubEnv("AUTH_SECRET", "");
+    const response = await POST(request({ type: "CUSTOMER", firstName: "Test", lastName: "Applicant", phone: "0241234567", city: "Accra", consent: true, data: { serviceInterest: "Taxi rides", expectedUsage: "Daily" } }));
+    expect(response.status).toBe(503);
+    expect(mocks.createApplication).not.toHaveBeenCalled();
+    expect(response.cookies.get(recognitionCookieName)).toBeUndefined();
+  });
+
+  it("uses a secure cookie in a production deployment", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ROVA_AUTH_ENVIRONMENT", "staging");
+    const response = await POST(request({ type: "CUSTOMER", firstName: "Test", lastName: "Applicant", phone: "0241234567", city: "Accra", consent: true, data: { serviceInterest: "Taxi rides", expectedUsage: "Daily" } }));
+    expect(response.cookies.get(recognitionCookieName)).toMatchObject({ secure: true, httpOnly: true, sameSite: "lax" });
   });
 });
