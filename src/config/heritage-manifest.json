@@ -1,0 +1,10 @@
+[
+  { "id": "mausoleum", "name": "Kwame Nkrumah Mausoleum", "image": "/heritage/mausoleum.webp" },
+  { "id": "arch", "name": "Independence Arch", "image": "/heritage/arch.webp" },
+  { "id": "palace", "name": "Manhyia Palace", "image": "/heritage/palace.webp" },
+  { "id": "fortress", "name": "Cape Coast fortress", "image": "/heritage/fortress.webp" },
+  { "id": "garden", "name": "Tropical garden", "image": "/heritage/garden.webp" },
+  { "id": "waterfall", "name": "Tropical waterfall", "image": "/heritage/waterfall.webp" },
+  { "id": "mosque", "name": "Larabanga Mosque", "image": "/heritage/mosque.webp" },
+  { "id": "crocodile", "name": "Paga crocodile pond", "image": "/heritage/crocodile.webp" }
+]

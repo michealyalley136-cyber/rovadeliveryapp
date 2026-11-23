@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { applicationFields, applicationTypes, ghanaCities, sharedApplicationFields } from "@/config/application-types";
 import { createApplication } from "@/server/application-service";
+import { createApplicationRecognition, recognitionCookieName, recognitionMaxAge } from "@/server/application-recognition";
 import { isApplicationEnabled } from "@/server/feature-flags";
 import { normalizeGhanaPhone } from "@/server/phone";
 import { checkRateLimit } from "@/server/rate-limit";
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const recognition = await createApplicationRecognition();
     const application = await createApplication({
       type: parsed.data.type,
       firstName: parsed.data.firstName,
@@ -77,7 +79,15 @@ export async function POST(request: Request) {
       area: parsed.data.area?.trim() || null,
       data: parsed.data.data,
     });
-    return NextResponse.json({ application, message: "Your application is received. Submission does not guarantee approval." }, { status: 201 });
+    const response = NextResponse.json({ application, message: "Your application is received. Submission does not guarantee approval." }, { status: 201 });
+    response.cookies.set(recognitionCookieName, recognition, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production" || new URL(request.url).protocol === "https:",
+      sameSite: "lax",
+      path: "/",
+      maxAge: recognitionMaxAge,
+    });
+    return response;
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";
     console.error("ROVA application submission failed", { error: detail });
