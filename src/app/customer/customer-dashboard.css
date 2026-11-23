@@ -73,13 +73,13 @@
 .customer-place-select { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
 .customer-place-select span { min-width: 0; display: grid; gap: 3px; }
 .customer-place-select small { color: #647067; overflow-wrap: anywhere; }
-.customer-place-form, .customer-booking form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 16px; }
+.customer-place-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 16px; }
 .customer-app label { display: grid; gap: 6px; color: #45554a; font-weight: 700; font-size: 12px; flex: 1 1 180px; }
 .customer-app input { width: 100%; min-width: 0; border: 1px solid #d5e2d7; border-radius: 9px; background: #fff; padding: 12px; color: #101814; }
 .customer-primary { border: 0; border-radius: 9px; padding: 12px 18px; background: #006838; color: #fff; font-weight: 700; }
 .customer-primary:disabled { opacity: .6; cursor: wait; }
 .customer-booking-page { display: block; padding: 24px 16px 60px; }
-.customer-booking-shell { max-width: 680px; margin: 0 auto; }
+.customer-booking-shell { max-width: 1240px; margin: 0 auto; }
 .customer-booking-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .customer-back { color: #006838; font-weight: 700; }
 .customer-booking-art { display: block; width: 100%; height: clamp(160px, 30vw, 260px); object-fit: cover; border-radius: 12px; margin-bottom: 20px; }
@@ -90,6 +90,53 @@
 .customer-active h2 { margin: 6px 0; font-size: 18px; }
 .customer-active p { color: #647067; margin: 0; }
 .customer-active button { border: 0; background: #e7f5ea; color: #006838; border-radius: 9px; padding: 10px; font-weight: 700; }
+.rova-map-planner { margin-top: 24px; padding: 22px; border: 1px solid #dce9df; border-radius: 20px; background: #fff; }
+.rova-map-phase { padding: 6px 9px; border-radius: 999px; background: #fff5d5; color: #7b5a00; font-size: 9px; font-weight: 800; letter-spacing: .6px; }
+.rova-map-intro, .rova-map-provider-note { color: #647067; line-height: 1.55; font-size: 12px; }
+.rova-map-provider-note { margin: 13px 0 0; font-size: 10px; }
+.rova-map-layout { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.6fr); gap: 16px; align-items: stretch; }
+.rova-map-panel { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.rova-selected-service { margin: 4px 0 0; color: #006838; font-size: 12px; font-weight: 700; }
+.rova-map-actions button { border: 0; border-radius: 8px; padding: 10px; background: #fff; color: #385044; font-weight: 700; }
+.rova-map-actions button.selected { background: #006838; color: #fff; }
+.rova-location-search { position: relative; }
+.rova-location-search form > div { display: flex; }
+.rova-location-search input { border-radius: 9px 0 0 9px; }
+.rova-location-search form button { flex: 0 0 auto; border: 0; border-radius: 0 9px 9px 0; padding: 0 13px; background: #006838; color: #fff; font-weight: 700; }
+.rova-location-search button:disabled { opacity: .55; cursor: not-allowed; }
+.rova-location-search ul { position: absolute; z-index: 12; left: 0; right: 0; max-height: 230px; overflow: auto; margin: 3px 0 0; padding: 0; list-style: none; border: 1px solid #d5e2d7; border-radius: 10px; background: #fff; box-shadow: 0 12px 25px #16351f24; }
+.rova-location-search li + li { border-top: 1px solid #edf2ee; }
+.rova-location-search li button { width: 100%; display: grid; gap: 3px; padding: 10px; border: 0; background: #fff; text-align: left; color: #183424; }
+.rova-location-search li button:hover { background: #eff8f0; }
+.rova-location-search li span { color: #647067; font-size: 10px; }
+.rova-map-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.rova-selected-points { display: grid; gap: 8px; }
+.rova-selected-points > div { display: grid; gap: 3px; padding: 11px; border: 1px solid #e2ebe4; border-radius: 10px; }
+.rova-selected-points span { color: #568067; font-size: 9px; font-weight: 800; letter-spacing: .8px; }
+.rova-selected-points strong { font-size: 11px; overflow-wrap: anywhere; }
+.rova-selected-points small { color: #718078; font-size: 10px; }
+.rova-route-button { width: 100%; }
+.rova-map-inline-error { margin: 0; padding: 9px 11px; border-radius: 8px; background: #fff1ed; color: #8d2c12; font-size: 11px; line-height: 1.5; }
+.rova-route-summary { padding: 13px; border-radius: 12px; background: #edf8ef; }
+.rova-route-summary > div { display: flex; justify-content: space-between; align-items: end; gap: 10px; margin: 6px 0; }
+.rova-route-summary strong { color: #006838; font-size: 22px; }
+.rova-route-summary span { font-size: 11px; }
+.rova-route-summary p { margin: 6px 0 0; color: #52685a; font-size: 10px; }
+.rova-map-shell { position: relative; min-height: 440px; overflow: hidden; border-radius: 16px; background: #edf2ef; border: 1px solid #dce5de; }
+.rova-map { position: absolute; inset: 0; }
+.rova-map-loading, .rova-map-unavailable { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; gap: 8px; padding: 30px; background: #f3f7f4; color: #486051; text-align: center; }
+.rova-map-unavailable strong { color: #173c26; font-size: 17px; }
+.rova-map-unavailable span { max-width: 400px; line-height: 1.6; }
+.rova-map-loading { z-index: 4; }
+.rova-map-selection { position: absolute; z-index: 6; top: 12px; left: 50%; transform: translateX(-50%); padding: 7px 11px; border-radius: 999px; background: #003b24e8; color: #fff; box-shadow: 0 4px 15px #0b2f1c30; font-size: 11px; font-weight: 700; }
+.rova-map-selecting .maplibregl-canvas { cursor: crosshair; }
+.rova-map-error { position: absolute; z-index: 7; left: 12px; right: 12px; bottom: 35px; margin: 0; padding: 9px; border-radius: 7px; background: #fff1ed; color: #8d2c12; font-size: 11px; }
+.rova-map-marker { width: 28px; height: 34px; display: grid; place-items: center; border: 3px solid #fff; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); box-shadow: 0 3px 9px #071c0d4f; color: #fff; font-size: 12px; font-weight: 900; cursor: grab; }
+.rova-map-marker::first-letter { transform: rotate(45deg); }
+.rova-map-marker-pickup { background: #006838; }
+.rova-map-marker-destination { background: #b3261e; }
+.rova-map-vehicle { width: 25px; height: 25px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 7px; background: #0b5e8b; color: #fff; box-shadow: 0 3px 8px #0a2c3f38; font-size: 10px; font-weight: 900; }
+.rova-map-vehicle-simulation { background: #8156a3; }
 .customer-trip { padding: 16px 0; border-top: 1px solid #e5eee7; display: flex; justify-content: space-between; gap: 16px; }
 .customer-trip p { margin: 5px 0 0; color: #647067; }
 .customer-trip > span { color: #006838; text-transform: capitalize; }
@@ -117,6 +164,11 @@
   .customer-welcome h1 { font-size: clamp(1.25rem, 5vw, 1.65rem); letter-spacing: -.04em; }
   .heritage-background { width: 38%; opacity: .9; mask-image: linear-gradient(to right, transparent, #000 30%); }
   .customer-services { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .rova-map-planner { padding: 17px; }
+  .rova-map-layout { grid-template-columns: 1fr; }
+  .rova-map-shell { min-height: 360px; }
+  .customer-booking-header { align-items: flex-start; }
+  .customer-booking-art { height: 150px; }
   .customer-service-image { height: clamp(105px, 31vw, 190px); }
   .customer-service-copy { min-height: 137px; padding: 13px 27px 16px 12px; }
   .customer-service h3 { font-size: 15px; }
