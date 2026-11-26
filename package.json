@@ -12,9 +12,13 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "backup:run": "node scripts/backup/backup.mjs",
+    "backup:restore": "node scripts/backup/restore.mjs",
+    "identity:notifications": "node scripts/process-identity-notifications.mjs",
     "admin:create": "node --env-file=.env.local scripts/create-admin.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1175.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "bcryptjs": "^3.0.3",

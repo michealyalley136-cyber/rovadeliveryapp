@@ -10,3 +10,7 @@ coverage
 !.env.staging.example
 *.tsbuildinfo
 prisma/*.db
+backups/
+*.dump
+*.dump.custom
+*.dump.custom.enc
