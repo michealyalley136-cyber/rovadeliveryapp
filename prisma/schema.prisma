@@ -45,6 +45,22 @@ enum TripStatus {
   EMERGENCY
 }
 
+enum BookingRequestStatus {
+  REQUESTED
+  CANCELLED
+}
+
+enum AccountSecurityTokenPurpose {
+  CUSTOMER_ACTIVATION
+  PASSWORD_RESET
+}
+
+enum AccountSecurityTokenDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 enum ServiceType {
   RIDE
   TAXI
@@ -145,6 +161,9 @@ model Application {
   applicant   Applicant         @relation(fields: [applicantId], references: [id])
   history     ApplicationStatusHistory[]
   notes       ApplicationNote[]
+  accountUserId String?             @unique
+  accountUser User?                 @relation("ApplicationAccountUser", fields: [accountUserId], references: [id], onDelete: SetNull)
+  securityTokens AccountSecurityToken[] @relation("ApplicationSecurityTokens")
 
   @@index([type, status, submittedAt])
   @@index([status, submittedAt])
@@ -219,8 +238,95 @@ model User {
   customerProfile CustomerProfile?
   operatorProfile OperatorProfile?
   tripsAsCustomer Trip[]           @relation("TripCustomer")
+  bookingRequests BookingRequest[]
+  bookingStatusChanges BookingRequestStatusHistory[] @relation("BookingStatusActor")
   simulatedRides  SimulatedRide[]
   auditEvents     AuditLog[]       @relation("AuditActor")
+  sourceApplication Application?   @relation("ApplicationAccountUser")
+  securityTokens AccountSecurityToken[]
+  customerSessions CustomerSession[]
+}
+
+model AccountSecurityToken {
+  id              String                           @id @default(cuid())
+  purpose         AccountSecurityTokenPurpose
+  tokenHash       String                           @unique
+  applicationId   Int?
+  userId          String?
+  recipientDigest String
+  deliveryStatus  AccountSecurityTokenDeliveryStatus @default(PENDING)
+  deliveryError   String?
+  deliveredAt     DateTime?
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  invalidatedAt   DateTime?
+  createdAt       DateTime                         @default(now())
+  application     Application?                    @relation("ApplicationSecurityTokens", fields: [applicationId], references: [id], onDelete: Cascade)
+  user            User?                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryJobs    IdentityNotificationOutbox[]
+
+  @@index([applicationId, purpose, createdAt])
+  @@index([userId, purpose, createdAt])
+  @@index([expiresAt, consumedAt, invalidatedAt])
+}
+
+enum IdentityNotificationType {
+  RESET_REQUEST
+  CUSTOMER_ACTIVATION
+  PASSWORD_RESET
+}
+
+enum IdentityNotificationStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+  EXPIRED
+  DEAD
+}
+
+model IdentityNotificationOutbox {
+  id                   String                       @id @default(cuid())
+  tokenId              String?
+  notificationType     IdentityNotificationType
+  dedupeKey            String
+  encryptedPayload     String?
+  encryptionKeyId      String
+  status               IdentityNotificationStatus  @default(PENDING)
+  nextAttemptAt        DateTime                     @default(now())
+  expiresAt            DateTime
+  attemptCount         Int                          @default(0)
+  maxAttempts          Int                          @default(6)
+  leaseOwner           String?
+  leaseExpiresAt       DateTime?
+  deliveredAt          DateTime?
+  cleanupAt            DateTime?
+  lastOutcomeCode      String?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  token                AccountSecurityToken?        @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([tokenId, status])
+  @@index([leaseExpiresAt, status])
+  @@index([expiresAt, status])
+}
+
+model CustomerSession {
+  id               String   @id @default(cuid())
+  userId           String
+  tokenHash        String   @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  revocationReason String?
+  userAgentHash    String?
+  ipAddressHash    String?
+  lastSeenAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt, revokedAt])
 }
 
 enum SimulatedRideStatus {
@@ -484,6 +590,53 @@ model Trip {
   @@index([status, requestedAt])
   @@index([customerId, requestedAt])
   @@index([operatorProfileId, requestedAt])
+}
+
+model BookingRequest {
+  id                    String                     @id @default(cuid())
+  reference             String                     @unique
+  customerId            String
+  service               ServiceType
+  status                BookingRequestStatus      @default(REQUESTED)
+  pickupName            String
+  pickupLatitude        Decimal                    @db.Decimal(10, 7)
+  pickupLongitude       Decimal                    @db.Decimal(10, 7)
+  pickupInstructions    String?
+  destinationName       String
+  destinationLatitude   Decimal                    @db.Decimal(10, 7)
+  destinationLongitude  Decimal                    @db.Decimal(10, 7)
+  routeDistanceMeters   Int
+  routeDurationSeconds  Int
+  routingProvider       String
+  routingProfile        String
+  routeCalculatedAt     DateTime
+  routeMetadata         Json
+  idempotencyKey        String
+  requestFingerprint    String
+  cancellationReason    String?
+  cancelledAt           DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  customer              User                       @relation(fields: [customerId], references: [id])
+  statusHistory         BookingRequestStatusHistory[]
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, createdAt, id])
+  @@index([status, createdAt])
+}
+
+model BookingRequestStatusHistory {
+  id                String                @id @default(cuid())
+  bookingRequestId  String
+  previousStatus    BookingRequestStatus?
+  newStatus         BookingRequestStatus
+  changedByUserId   String
+  reason            String?
+  createdAt         DateTime              @default(now())
+  bookingRequest    BookingRequest        @relation(fields: [bookingRequestId], references: [id], onDelete: Restrict)
+  changedBy         User                  @relation("BookingStatusActor", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([bookingRequestId, createdAt])
 }
 
 model LedgerEntry {
