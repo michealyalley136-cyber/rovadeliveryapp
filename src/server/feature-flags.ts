@@ -15,6 +15,10 @@ export const featureFlags = {
   liveDispatchEnabled: process.env.LIVE_DISPATCH_ENABLED === "true",
 };
 
+export function isCustomerRidesEnabled() {
+  return process.env.CUSTOMER_RIDES_ENABLED === "true";
+}
+
 export function isApplicationEnabled(type: string) {
   if (!featureFlags.applicationsEnabled) return false;
   if (type === "CUSTOMER") return featureFlags.customerApplicationsEnabled;

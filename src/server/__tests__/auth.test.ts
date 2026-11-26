@@ -2,8 +2,11 @@ import { SignJWT } from "jose";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createAdminSession,
+  createCustomerSession,
   createDemoSession,
+  clearCustomerSession,
   getAdminSession,
+  getCustomerSession,
   getSession,
   requireRole,
 } from "../auth";
@@ -28,15 +31,82 @@ const cookieStore = vi.hoisted(() => {
   };
 });
 
+const databaseMock = vi.hoisted(() => {
+  const sessions = new Map<string, {
+    id: string;
+    userId: string;
+    tokenHash: string;
+    lastSeenAt: Date;
+    revokedAt: Date | null;
+  }>();
+  return {
+    sessions,
+    database: {
+      user: {
+        findUnique: vi.fn(async () => ({
+          id: "isolated-customer",
+          status: "ACTIVE",
+          roles: [{ roleId: "customer-role" }],
+        })),
+      },
+      customerSession: {
+        create: vi.fn(async ({ data }: { data: {
+          id: string; userId: string; tokenHash: string; expiresAt: Date;
+        } }) => {
+          sessions.set(data.tokenHash, {
+            id: data.id,
+            userId: data.userId,
+            tokenHash: data.tokenHash,
+            lastSeenAt: new Date(),
+            revokedAt: null,
+          });
+          return data;
+        }),
+        findFirst: vi.fn(async ({ where }: { where: { id: string; tokenHash: string; userId: string } }) => {
+          const record = sessions.get(where.tokenHash);
+          return record && record.id === where.id && record.userId === where.userId && !record.revokedAt
+            ? {
+              ...record,
+              user: { status: "ACTIVE", roles: [{ roleId: "customer-role" }] },
+            }
+            : null;
+        }),
+        update: vi.fn(async ({ where, data }: { where: { id: string }; data: { lastSeenAt: Date } }) => {
+          for (const record of sessions.values()) {
+            if (record.id === where.id) record.lastSeenAt = data.lastSeenAt;
+          }
+        }),
+        updateMany: vi.fn(async ({ where, data }: {
+          where: { id: string; userId: string; tokenHash: string; revokedAt: null };
+          data: { revokedAt: Date; revocationReason: string };
+        }) => {
+          const record = sessions.get(where.tokenHash);
+          if (
+            record &&
+            record.id === where.id &&
+            record.userId === where.userId &&
+            !record.revokedAt
+          ) {
+            record.revokedAt = data.revokedAt;
+            return { count: 1 };
+          }
+          return { count: 0 };
+        }),
+      },
+    },
+  };
+});
+
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({
   cookies: async () => cookieStore.store,
 }));
+vi.mock("@/server/db", () => ({ getDatabase: () => databaseMock.database }));
 
 const testSecret = "isolated-jwt-authentication-test-secret-01";
 
 type TestEnvironment = "staging" | "production";
-type TestTokenKind = "demo" | "admin";
+type TestTokenKind = "demo" | "admin" | "customer";
 
 function configureEnvironment(environment: TestEnvironment) {
   vi.stubEnv("NODE_ENV", "production");
@@ -76,6 +146,7 @@ async function signTestToken(options: {
   let token = new SignJWT({
     role: options.role ?? (kind === "demo" ? "CUSTOMER" : "VIEW_ONLY"),
     name: "Isolated Test User",
+    ...(kind === "customer" ? { sid: "isolated-session" } : {}),
     ...(options.omitKind ? {} : { kind }),
   }).setProtectedHeader({ alg: "HS256" });
 
@@ -91,6 +162,7 @@ async function signTestToken(options: {
 
 beforeEach(() => {
   cookieStore.values.clear();
+  databaseMock.sessions.clear();
   vi.unstubAllEnvs();
   configureEnvironment("staging");
 });
@@ -138,6 +210,24 @@ describe("environment-bound JWT sessions", () => {
       role: "VIEW_ONLY",
       name: "Test Administrator",
     });
+  });
+
+  it.each(["staging", "production"] as const)("accepts a valid %s verified customer token", async (environment) => {
+    configureEnvironment(environment);
+    await createCustomerSession("isolated-customer");
+    expect(await getCustomerSession()).toEqual({ id: "isolated-customer" });
+  });
+
+  it.each([
+    ["staging", "production"],
+    ["production", "staging"],
+  ] as const)("rejects a %s customer JWT in %s", async (source, target) => {
+    configureEnvironment(source);
+    await createCustomerSession("isolated-customer");
+    const customerToken = getCookie("rova_customer_session");
+    configureEnvironment(target);
+    setCookie("rova_customer_session", customerToken);
+    expect(await getCustomerSession()).toBeNull();
   });
 
   it.each([
@@ -231,6 +321,87 @@ describe("environment-bound JWT sessions", () => {
     setCookie("rova_demo_session", getCookie("rova_admin_session"));
 
     expect(await getSession()).toBeNull();
+  });
+
+  it("does not accept shared demo or administrator tokens as verified customer sessions", async () => {
+    await createDemoSession("CUSTOMER");
+    setCookie("rova_customer_session", getCookie("rova_demo_session"));
+    expect(await getCustomerSession()).toBeNull();
+
+    await createAdminSession({ id: "isolated-admin", role: "VIEW_ONLY", name: "Test Administrator" });
+    setCookie("rova_customer_session", getCookie("rova_admin_session"));
+    expect(await getCustomerSession()).toBeNull();
+  });
+
+  it("clears verified customer and demo sessions from the shared logout endpoint", async () => {
+    await createDemoSession("CUSTOMER");
+    await createCustomerSession("isolated-customer");
+    expect(cookieStore.values.has("rova_demo_session")).toBe(true);
+    expect(cookieStore.values.has("rova_customer_session")).toBe(true);
+
+    const { DELETE } = await import("@/app/api/session/route");
+    const response = await DELETE();
+
+    expect(response.status).toBe(200);
+    expect(cookieStore.values.has("rova_demo_session")).toBe(false);
+    expect(cookieStore.values.has("rova_customer_session")).toBe(false);
+    expect(await getSession()).toBeNull();
+    expect(await getCustomerSession()).toBeNull();
+  });
+
+  it("keeps the cookie after a revocation database failure and allows a safe retry", async () => {
+    await createCustomerSession("isolated-customer");
+    const token = getCookie("rova_customer_session");
+    databaseMock.database.customerSession.updateMany.mockRejectedValueOnce(new Error("database unavailable"));
+
+    await expect(clearCustomerSession()).rejects.toThrow("database unavailable");
+    expect(getCookie("rova_customer_session")).toBe(token);
+
+    await clearCustomerSession();
+    expect(cookieStore.values.has("rova_customer_session")).toBe(false);
+    setCookie("rova_customer_session", token);
+    expect(await getCustomerSession()).toBeNull();
+  });
+
+  it("returns retryable logout failure without clearing the customer cookie", async () => {
+    await createCustomerSession("isolated-customer");
+    const token = getCookie("rova_customer_session");
+    databaseMock.database.customerSession.updateMany.mockRejectedValueOnce(new Error("database unavailable"));
+    const logError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { DELETE } = await import("@/app/api/customer/session/route");
+      const response = await DELETE();
+
+      expect(response.status).toBe(503);
+      expect(getCookie("rova_customer_session")).toBe(token);
+      expect(await response.json()).toMatchObject({
+        error: "Sign-out could not be fully confirmed. Retry after connectivity returns.",
+      });
+    } finally {
+      logError.mockRestore();
+    }
+  });
+
+  it("revokes only the matching session and safely handles concurrent repeated logout", async () => {
+    await createCustomerSession("isolated-customer");
+    const firstToken = getCookie("rova_customer_session");
+    await createCustomerSession("isolated-customer");
+    const secondToken = getCookie("rova_customer_session");
+
+    await Promise.all([clearCustomerSession(), clearCustomerSession()]);
+    expect(cookieStore.values.has("rova_customer_session")).toBe(false);
+    setCookie("rova_customer_session", secondToken);
+    expect(await getCustomerSession()).toBeNull();
+    setCookie("rova_customer_session", firstToken);
+    expect(await getCustomerSession()).toEqual({ id: "isolated-customer" });
+    expect(databaseMock.database.customerSession.updateMany).toHaveBeenLastCalledWith({
+      where: expect.objectContaining({
+        tokenHash: expect.any(String),
+        revokedAt: null,
+        userId: "isolated-customer",
+      }),
+      data: { revokedAt: expect.any(Date), revocationReason: "LOGOUT" },
+    });
   });
 
   it("preserves demo role restrictions and administrator role validation", async () => {

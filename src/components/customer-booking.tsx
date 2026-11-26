@@ -6,7 +6,10 @@ import { useEffect, useState } from "react";
 import { customerServices } from "@/config/customer-services";
 import { CustomerMapPlanner } from "@/components/customer-map-planner";
 
-export function CustomerBooking({ service }: { service: "RIDE" | "TAXI" }) {
+export function CustomerBooking({
+  service,
+  persistentBookingEnabled = false,
+}: { service: "RIDE" | "TAXI"; persistentBookingEnabled?: boolean }) {
   const details = customerServices.find((item) => item.id === service)!;
   const routeProfile = service === "RIDE" ? "MOTORCYCLE" : "DRIVING";
   const [initialPickup, setInitialPickup] = useState("");
@@ -38,7 +41,12 @@ export function CustomerBooking({ service }: { service: "RIDE" | "TAXI" }) {
         <span className="customer-kicker">{service === "RIDE" ? "MOTORCYCLE" : "TAXI"} JOURNEY</span>
         <h1>{details.title}</h1>
         <p>This selected service stays fixed while you choose locations and review an estimated road route. No driver is dispatched and no payment is collected.</p>
-        {detailsReady ? <CustomerMapPlanner service={service} initialPickup={initialPickup} initialDestination={initialDestination} /> : <p role="status">Preparing your selected service…</p>}
+        {detailsReady ? <CustomerMapPlanner
+          service={service}
+          initialPickup={initialPickup}
+          initialDestination={initialDestination}
+          persistentBookingEnabled={persistentBookingEnabled}
+        /> : <p role="status">Preparing your selected service…</p>}
       </section>
     </div>
   </main>;

@@ -290,6 +290,7 @@
 .detail-review { padding: 15px; border: 1px solid #e8ece9; background: #fbfcfa; }
 .detail-review .apply-primary { width: 100%; }
 .admin-assign-button { width: 100%; margin-bottom: 8px; text-align: left; }
+.admin-activation-button { margin-top: 10px; background: #0c3560; }
 .admin-history { margin: 8px 0; padding: 10px; border-left: 2px solid #d4dfd3; background: #fff; }
 .admin-history b, .admin-history small { display: block; }
 .admin-history b { color: #39566a; font-size: 8px; }

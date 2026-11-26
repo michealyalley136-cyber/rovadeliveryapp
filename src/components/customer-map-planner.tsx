@@ -5,6 +5,7 @@ import { RovaMap } from "@/components/rova-map";
 import { formatCoordinates, isWithinGhana } from "@/lib/maps/ghana";
 import { routeInputKey, shouldAutocomplete } from "@/lib/maps/planner-state";
 import type { GeoPlace, MapCoordinates, MapStyleConfig, RouteResult, ServiceZone } from "@/lib/maps/types";
+import type { BookingDto } from "@/server/booking-types";
 
 type Target = "pickup" | "destination";
 type Config = {
@@ -98,10 +99,16 @@ function LocationSearch({ target, onSelect, disabled, initialValue = "" }: { tar
   </div>;
 }
 
-export function CustomerMapPlanner({ service, initialPickup = "", initialDestination = "" }: {
+export function CustomerMapPlanner({
+  service,
+  initialPickup = "",
+  initialDestination = "",
+  persistentBookingEnabled = false,
+}: {
   service: "RIDE" | "TAXI";
   initialPickup?: string;
   initialDestination?: string;
+  persistentBookingEnabled?: boolean;
 }) {
   const [config, setConfig] = useState<Config | null>(null);
   const [configError, setConfigError] = useState("");
@@ -113,7 +120,11 @@ export function CustomerMapPlanner({ service, initialPickup = "", initialDestina
   const [busy, setBusy] = useState(false);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [error, setError] = useState("");
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState<BookingDto | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const routeRequest = useRef<AbortController | null>(null);
+  const idempotencyKey = useRef<string | null>(null);
   const currentRouteKey = routeInputKey(service, pickup, destination);
   const route = completedRouteKey === currentRouteKey ? routeResult : null;
 
@@ -132,6 +143,7 @@ export function CustomerMapPlanner({ service, initialPickup = "", initialDestina
     setBusy(false);
     setRouteResult(null);
     setCompletedRouteKey(null);
+    idempotencyKey.current = null;
   }, []);
 
   useEffect(() => {
@@ -237,6 +249,7 @@ export function CustomerMapPlanner({ service, initialPickup = "", initialDestina
       if (controller.signal.aborted || routeRequest.current !== controller) return;
       setRouteResult(payload.route);
       setCompletedRouteKey(requestKey);
+      idempotencyKey.current = crypto.randomUUID();
     } catch (reason) {
       if (reason instanceof Error && reason.name === "AbortError") return;
       if (!controller.signal.aborted && routeRequest.current === controller) {
@@ -248,6 +261,67 @@ export function CustomerMapPlanner({ service, initialPickup = "", initialDestina
         setBusy(false);
       }
     }
+  }
+
+  async function submitBooking() {
+    if (!pickup || !destination || !route || !persistentBookingEnabled) return;
+    setSubmitBusy(true);
+    setError("");
+    try {
+      const payload = await responseJson(await fetch("/api/v1/bookings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          service,
+          pickupName: pickup.name,
+          pickupLatitude: pickup.latitude,
+          pickupLongitude: pickup.longitude,
+          destinationName: destination.name,
+          destinationLatitude: destination.latitude,
+          destinationLongitude: destination.longitude,
+          idempotencyKey: idempotencyKey.current ?? crypto.randomUUID(),
+        }),
+      }));
+      setConfirmedBooking(payload.booking);
+      setDetailsOpen(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The booking request could not be saved.");
+    } finally {
+      setSubmitBusy(false);
+    }
+  }
+
+  if (confirmedBooking) {
+    return <section className="rova-booking-confirmation" aria-live="polite">
+      <span className="customer-kicker">REQUEST RECEIVED</span>
+      <div className="rova-confirmation-mark" aria-hidden="true">ROVA</div>
+      <h2>Your pilot booking is saved</h2>
+      <p className="rova-booking-reference">{confirmedBooking.reference}</p>
+      <dl>
+        <div><dt>Service</dt><dd>{confirmedBooking.service === "RIDE" ? "Motorcycle" : "Taxi"}</dd></div>
+        <div><dt>Pickup</dt><dd>{confirmedBooking.pickupName}</dd></div>
+        <div><dt>Destination</dt><dd>{confirmedBooking.destinationName}</dd></div>
+        <div><dt>Road distance</dt><dd>{(confirmedBooking.routeDistanceMeters / 1000).toFixed(1)} km</dd></div>
+        <div><dt>Estimated travel time</dt><dd>{Math.ceil(confirmedBooking.routeDurationSeconds / 60)} min</dd></div>
+        <div><dt>Created</dt><dd>{new Date(confirmedBooking.createdAt).toLocaleString()}</dd></div>
+        <div><dt>Status</dt><dd>Request received</dd></div>
+      </dl>
+      <p className="rova-pilot-disclaimer">This is a non-operational pilot booking. No driver will be dispatched or arrive, and no payment has been collected.</p>
+      <div className="rova-confirmation-actions">
+        <button type="button" onClick={() => setDetailsOpen((open) => !open)}>{detailsOpen ? "Hide booking" : "View booking"}</button>
+        <a className="customer-primary" href="/customer">Return to dashboard</a>
+      </div>
+      {detailsOpen && <pre className="rova-booking-details">{JSON.stringify({
+        reference: confirmedBooking.reference,
+        service: confirmedBooking.service,
+        status: confirmedBooking.status,
+        pickup: confirmedBooking.pickupName,
+        destination: confirmedBooking.destinationName,
+        distanceMeters: confirmedBooking.routeDistanceMeters,
+        durationSeconds: confirmedBooking.routeDurationSeconds,
+        createdAt: confirmedBooking.createdAt,
+      }, null, 2)}</pre>}
+    </section>;
   }
 
   return <section className="rova-map-planner" aria-labelledby="rova-map-planner-title">
@@ -269,7 +343,19 @@ export function CustomerMapPlanner({ service, initialPickup = "", initialDestina
         </div>
         <button className="customer-primary rova-route-button" type="button" disabled={busy || !pickup || !destination || !(service === "RIDE" ? config?.providers.motorcycle : config?.providers.driving)} onClick={() => void calculateRoute()}>{busy ? "Calculating road route…" : "Get road route"}</button>
         {error && <p className="rova-map-inline-error" role="alert">{error}</p>}
-        {route && <section className="rova-route-summary" aria-live="polite"><span className="customer-kicker">ROAD ROUTE</span><div><strong>{(route.distanceMeters / 1000).toFixed(1)} km</strong><span>Estimated {Math.ceil(route.durationSeconds / 60)} min · {route.provider}</span></div><p>This is a route estimate, not a driver dispatch or guaranteed arrival time.</p></section>}
+        {route && <section className="rova-route-summary" aria-live="polite">
+          <span className="customer-kicker">REVIEW BOOKING</span>
+          <div><strong>{(route.distanceMeters / 1000).toFixed(1)} km</strong><span>Estimated {Math.ceil(route.durationSeconds / 60)} min · {route.provider}</span></div>
+          <p>The server will verify this route again before saving. This is a request only, not a driver dispatch or guaranteed arrival time.</p>
+          {persistentBookingEnabled ? <>
+            <p className="rova-pilot-disclaimer">Saved pilot requests are non-operational. No driver will arrive.</p>
+            <button className="customer-primary rova-submit-booking" type="button" disabled={submitBusy} onClick={() => void submitBooking()}>
+              {submitBusy ? "Verifying and saving…" : "Submit booking request"}
+            </button>
+          </> : <p className="rova-booking-unavailable">
+            Persistent booking submission is unavailable until a verified customer account and approved staging integration are enabled.
+          </p>}
+        </section>}
       </div>
       <RovaMap
         styleUrl={config?.style?.styleUrl ?? null}

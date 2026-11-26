@@ -3,13 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  getCustomerSession: vi.fn(),
+  getVerifiedCustomerAccount: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
-vi.mock("@/server/auth", () => ({ getSession: mocks.getSession }));
+vi.mock("@/server/auth", () => ({
+  getSession: mocks.getSession,
+  getCustomerSession: mocks.getCustomerSession,
+}));
+vi.mock("@/server/customer-account", () => ({
+  getVerifiedCustomerAccount: mocks.getVerifiedCustomerAccount,
+}));
+vi.mock("@/server/feature-flags", () => ({
+  isCustomerRidesEnabled: () => false,
+}));
 
 import { CustomerBooking } from "@/components/customer-booking";
 import { CustomerDashboard } from "@/components/customer-dashboard";
@@ -21,6 +32,8 @@ import { routeInputKey, shouldAutocomplete } from "@/lib/maps/planner-state";
 describe("customer service-first booking flow", () => {
   beforeEach(() => {
     mocks.getSession.mockResolvedValue({ id: "customer-test", role: "CUSTOMER", name: "Test Customer" });
+    mocks.getCustomerSession.mockResolvedValue(null);
+    mocks.getVerifiedCustomerAccount.mockResolvedValue(null);
   });
 
   it("keeps the full planner off the main customer dashboard", () => {

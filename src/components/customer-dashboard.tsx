@@ -11,6 +11,7 @@ import { HeritageBackground } from "@/components/heritage-background";
 import { SimulationActivity } from "@/components/simulation-activity";
 import type { Trip } from "@/lib/domain";
 import { startVisiblePolling } from "@/lib/visible-polling";
+import type { BookingDto, BookingHistoryItem } from "@/server/booking-types";
 
 type Section = "Home" | "Activity" | "Wallet" | "Safety" | "Account";
 type RideService = "RIDE" | "TAXI";
@@ -55,7 +56,19 @@ function Icon({ name }: { name: string }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name] ?? paths.pin} /></svg>;
 }
 
-export function CustomerDashboard({ user, rotation }: { user: { name: string }; rotation: HeritageRotation }) {
+export function CustomerDashboard({
+  user,
+  rotation,
+  accountId = "",
+  verifiedCustomer = false,
+  persistentBookingEnabled = false,
+}: {
+  user: { name: string };
+  rotation: HeritageRotation;
+  accountId?: string;
+  verifiedCustomer?: boolean;
+  persistentBookingEnabled?: boolean;
+}) {
   const router = useRouter();
   const [section, setSection] = useState<Section>("Home");
   const [locationOpen, setLocationOpen] = useState(false);
@@ -65,6 +78,12 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
   const [trips, setTrips] = useState<Trip[] | null>(null);
   const [error, setError] = useState("");
   const [dashboardError, setDashboardError] = useState("");
+  const [bookings, setBookings] = useState<BookingDto[] | null>(persistentBookingEnabled ? null : []);
+  const [bookingError, setBookingError] = useState("");
+  const [bookingCursor, setBookingCursor] = useState<string | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<BookingDto | null>(null);
+  const [bookingHistory, setBookingHistory] = useState<BookingHistoryItem[] | null>(null);
+  const [bookingBusy, setBookingBusy] = useState("");
   const [message, setMessage] = useState("");
   const [placeLabel, setPlaceLabel] = useState("Home");
   const [placeAddress, setPlaceAddress] = useState("");
@@ -91,6 +110,100 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
       },
     });
   }, [router]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setBookings(persistentBookingEnabled ? null : []);
+      setBookingCursor(null);
+      setBookingError("");
+      setSelectedBooking(null);
+      setBookingHistory(null);
+    });
+    if (!persistentBookingEnabled) return () => { active = false; };
+    const stopPolling = startVisiblePolling({
+      interval: 15000,
+      maxInterval: 120000,
+      immediate: true,
+      async run(signal) {
+        const response = await fetch("/api/v1/bookings?limit=12", { cache: "no-store", signal });
+        if (response.status === 401) {
+          if (!signal.aborted) router.refresh();
+          throw new Error("Customer session expired.");
+        }
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? "Could not load saved bookings.");
+        if (!signal.aborted) {
+          setBookings(result.bookings);
+          setBookingCursor(result.nextCursor);
+          setBookingError("");
+        }
+      },
+      onError(reason) {
+        setBookingError(reason instanceof Error ? reason.message : "Could not load saved bookings.");
+      },
+    });
+    return () => {
+      active = false;
+      stopPolling();
+    };
+  }, [accountId, persistentBookingEnabled, router]);
+
+  async function loadMoreBookings() {
+    if (!bookingCursor || bookingBusy) return;
+    setBookingBusy("load");
+    try {
+      const response = await fetch(`/api/v1/bookings?limit=12&cursor=${encodeURIComponent(bookingCursor)}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not load more saved bookings.");
+      setBookings((current) => [...(current ?? []), ...result.bookings]);
+      setBookingCursor(result.nextCursor);
+      setBookingError("");
+    } catch (reason) {
+      setBookingError(reason instanceof Error ? reason.message : "Could not load more saved bookings.");
+    } finally {
+      setBookingBusy("");
+    }
+  }
+
+  async function viewBooking(booking: BookingDto) {
+    setSelectedBooking(booking);
+    setBookingHistory(null);
+    setBookingBusy(booking.id);
+    try {
+      const response = await fetch(`/api/v1/bookings/${encodeURIComponent(booking.id)}/history`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not load booking details.");
+      setBookingHistory(result.history);
+      setBookingError("");
+    } catch (reason) {
+      setBookingError(reason instanceof Error ? reason.message : "Could not load booking details.");
+    } finally {
+      setBookingBusy("");
+    }
+  }
+
+  async function cancelBooking(booking: BookingDto) {
+    setBookingBusy(booking.id);
+    try {
+      const response = await fetch(`/api/v1/bookings/${encodeURIComponent(booking.id)}/cancel`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "The booking could not be cancelled.");
+      setBookings((current) => current?.map((item) => item.id === result.booking.id ? result.booking : item) ?? [result.booking]);
+      setSelectedBooking(selectedBooking?.id === result.booking.id ? result.booking : selectedBooking);
+      setMessage(`Booking ${result.booking.reference} was cancelled.`);
+      setBookingError("");
+    } catch (reason) {
+      setBookingError(reason instanceof Error ? reason.message : "The booking could not be cancelled.");
+    } finally {
+      setBookingBusy("");
+    }
+  }
 
   function useLocation() {
     setLocationError("");
@@ -124,6 +237,7 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
   }
 
   const active = trips?.find((trip) => !["TRIP_COMPLETED", "CANCELLED"].includes(trip.status));
+  const latestBooking = bookings?.[0] ?? null;
   const openBooking = (service: RideService, address?: string) => {
     try {
       sessionStorage.setItem("rova-demo-booking", JSON.stringify({ pickup: location, destination: address ?? "" }));
@@ -155,9 +269,12 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
         </div>}
       </header>
       <div className="customer-content">
-        <p className="customer-demo">DEMO WORKSPACE · No real services, payments or tracking</p>
+        <p className="customer-demo">{verifiedCustomer
+          ? "VERIFIED CUSTOMER PILOT · Saved requests only · No dispatch or payments"
+          : "DEMO WORKSPACE · No real services, payments or tracking"}</p>
         {error && <p className="customer-alert" role="alert">{error}</p>}
         {dashboardError && <p className="customer-alert" role="alert">{dashboardError} {trips && "Displayed activity may be out of date."}</p>}
+        {bookingError && <p className="customer-alert" role="alert">{bookingError} {bookings?.length ? "Displayed booking history may be out of date." : ""}</p>}
         {message && <p className="customer-message" role="status">{message} <button onClick={() => setMessage("")} aria-label="Dismiss message">×</button></p>}
         {section === "Home" && <>
           <section className={`customer-welcome ${hour >= 18 || hour < 5 ? "customer-welcome-evening" : ""}`}>
@@ -165,6 +282,15 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
             <div className="customer-welcome-copy"><p>{greeting(hour)}, {user.name.trim().split(/\s+/)[0]}!</p><h1>What would you like<br />to do today?</h1><span>Wherever life takes you, ROVA is with you.</span></div>
           </section>
           {active && <section className="customer-active"><div><span className="customer-kicker">ACTIVE DEMO RIDE</span><h2>{active.destination}</h2><p>{active.status.replaceAll("_", " ").toLowerCase()} · from {active.pickup}</p></div><button onClick={() => setSection("Activity")}>View activity →</button></section>}
+          {persistentBookingEnabled && latestBooking && <section className="customer-active rova-latest-booking">
+            <div>
+              <span className="customer-kicker">LATEST SAVED BOOKING</span>
+              <h2>{latestBooking.destinationName}</h2>
+              <p>{latestBooking.reference} · {latestBooking.status === "REQUESTED" ? "Request received" : "Cancelled"} · from {latestBooking.pickupName}</p>
+              <small>Non-operational pilot request. No driver has been dispatched.</small>
+            </div>
+            <button onClick={() => setSection("Activity")}>View booking →</button>
+          </section>}
           <div className="customer-section-heading customer-explore-heading"><div><span className="customer-kicker">EXPLORE ROVA</span><h2>What can we help you with?</h2></div></div>
           <div className="customer-services">{customerServices.map((service) => <button type="button" className={`customer-service ${service.color}`} key={service.id} onClick={() => service.id === "RIDE" || service.id === "TAXI" ? openBooking(service.id) : setMessage(`${service.title} is coming soon and is not available for bookings.`)}>
             <div className="customer-service-image"><Image src={service.image} alt="" width={376} height={270} sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 360px" /></div>
@@ -173,10 +299,40 @@ export function CustomerDashboard({ user, rotation }: { user: { name: string }; 
           <button className="customer-safety" onClick={() => setSection("Safety")}><span className="customer-safety-icon"><Icon name="Safety" /></span><span><small>ROVA SAFETY</small><strong>Your safety comes first.</strong><span>Explore our plans for safer journeys.</span></span><b aria-hidden="true">→</b></button>
           <SavedDestinations places={places} setEditing={setEditing} setPlaceLabel={setPlaceLabel} setPlaceAddress={setPlaceAddress} select={(address) => openBooking("RIDE", address)} remove={(id) => savePlaces(places.filter((place) => place.id !== id))} editing={editing} placeLabel={placeLabel} placeAddress={placeAddress} save={(event) => { event.preventDefault(); const place = { id: editing ?? crypto.randomUUID(), label: placeLabel.trim(), address: placeAddress.trim() }; if (savePlaces(editing ? places.map((old) => old.id === editing ? place : old) : [...places, place])) { setEditing(null); setPlaceLabel("Home"); setPlaceAddress(""); } }} />
         </>}
-        {section === "Activity" && <section className="customer-panel"><span className="customer-kicker">YOUR JOURNEYS</span><h1>Activity</h1><SimulationActivity /><h2>Earlier shared demo activity</h2><p>Shared demo activity is temporary and may reset when the server restarts.</p>{trips === null ? <p>Loading activity…</p> : trips.length ? trips.map((trip) => <div className="customer-trip" key={trip.id}><div><strong>{trip.destination}</strong><p>From {trip.pickup} · {trip.service === "RIDE" ? "Motorcycle" : "Cab"}</p></div><span>{trip.status.replaceAll("_", " ").toLowerCase()}</span></div>) : <p>No earlier demo rides.</p>}</section>}
+        {section === "Activity" && <section className="customer-panel">
+          <span className="customer-kicker">YOUR JOURNEYS</span><h1>Activity</h1><SimulationActivity />
+          {persistentBookingEnabled && <>
+            <h2>Saved pilot bookings</h2>
+            <p>These database-backed requests do not dispatch a driver or collect payment.</p>
+            {bookings === null ? <p role="status">Loading saved bookings…</p> : bookings.length ? <>
+              {bookings.map((booking) => <div className="customer-trip rova-booking-row" key={booking.id}>
+                <div><strong>{booking.reference}</strong><p>{booking.service === "RIDE" ? "Motorcycle" : "Taxi"} · {booking.pickupName} → {booking.destinationName}</p><small>{new Date(booking.createdAt).toLocaleString()} · {(booking.routeDistanceMeters / 1000).toFixed(1)} km</small></div>
+                <div><span>{booking.status === "REQUESTED" ? "Request received" : "Cancelled"}</span><button type="button" onClick={() => void viewBooking(booking)} disabled={bookingBusy === booking.id}>View details</button>{booking.status === "REQUESTED" && <button type="button" disabled={bookingBusy === booking.id} onClick={() => void cancelBooking(booking)}>Cancel</button>}</div>
+              </div>)}
+              {bookingCursor && <button type="button" className="customer-primary" disabled={bookingBusy === "load"} onClick={() => void loadMoreBookings()}>{bookingBusy === "load" ? "Loading…" : "Load older bookings"}</button>}
+            </> : <p>No persistent booking requests yet.</p>}
+            {selectedBooking && <section className="rova-booking-details-panel">
+              <h3>{selectedBooking.reference}</h3>
+              <p>{selectedBooking.pickupName} → {selectedBooking.destinationName}</p>
+              <p>{Math.ceil(selectedBooking.routeDurationSeconds / 60)} min · {(selectedBooking.routeDistanceMeters / 1000).toFixed(1)} km · {selectedBooking.routingProvider}</p>
+              <p>Created {new Date(selectedBooking.createdAt).toLocaleString()} · {selectedBooking.status === "REQUESTED" ? "Request received" : "Cancelled"}</p>
+              {bookingHistory === null ? <p role="status">Loading status history…</p> : <ul aria-label="Booking status history">{bookingHistory.map((entry) => <li key={entry.id}><strong>{entry.newStatus === "REQUESTED" ? "Request received" : "Cancelled"}</strong> · {new Date(entry.createdAt).toLocaleString()}{entry.reason && <span>{entry.reason}</span>}</li>)}</ul>}
+              <p className="rova-pilot-disclaimer">Non-operational pilot request. No driver will arrive and no payment is collected.</p>
+              <button type="button" onClick={() => { setSelectedBooking(null); setBookingHistory(null); }}>Close details</button>
+            </section>}
+          </>}
+          <h2>Earlier shared demo activity</h2><p>Shared demo activity is temporary and may reset when the server restarts.</p>{trips === null ? <p>Loading activity…</p> : trips.length ? trips.map((trip) => <div className="customer-trip" key={trip.id}><div><strong>{trip.destination}</strong><p>From {trip.pickup} · {trip.service === "RIDE" ? "Motorcycle" : "Cab"}</p></div><span>{trip.status.replaceAll("_", " ").toLowerCase()}</span></div>) : <p>No earlier demo rides.</p>}
+        </section>}
         {section === "Wallet" && <section className="customer-panel"><span className="customer-kicker">COMING SOON</span><h1>Wallet</h1><p>Payment methods, credits and receipts are not available yet. No payments are collected in this demo.</p></section>}
         {section === "Safety" && <section className="customer-panel"><span className="customer-kicker">ROVA SAFETY</span><h1>Your safety comes first.</h1><p>We are preparing safety features for future service. Emergency SOS, trusted contacts, trip sharing, driver verification and incident reporting are not available in this demo.</p><p>If you are in immediate danger, contact your local emergency services.</p></section>}
-        {section === "Account" && <section className="customer-panel"><span className="customer-kicker">DEMO ACCOUNT</span><h1>{user.name}</h1><p>This is a shared demo profile, not a real customer account. Saved destinations remain on this browser only.</p><button className="customer-primary" onClick={() => void signOut()}>Sign out</button></section>}
+        {section === "Account" && <section className="customer-panel">
+          <span className="customer-kicker">{verifiedCustomer ? "VERIFIED CUSTOMER" : "DEMO ACCOUNT"}</span>
+          <h1>{user.name}</h1>
+          <p>{verifiedCustomer
+            ? "This is an independently authenticated customer account. Saved booking requests are private and database-backed; driver dispatch and payments remain unavailable."
+            : "This is a shared demo profile, not a real customer account. Saved destinations remain on this browser only."}</p>
+          <button className="customer-primary" onClick={() => void signOut()}>Sign out</button>
+        </section>}
       </div>
       <div className="customer-bottom">{navigation("Mobile customer navigation")}</div>
     </div>

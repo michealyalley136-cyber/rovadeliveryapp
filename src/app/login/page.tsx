@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { CustomerLoginForm } from "@/components/customer-login-form";
 import styles from "./login.module.css";
 
-export const metadata = { title: "Login | ROVA Ghana" };
+export const metadata = { title: "Customer Login | ROVA Ghana" };
 
 export default function LoginPage() {
   return (
@@ -11,29 +12,22 @@ export default function LoginPage() {
         <Link className={styles.home} href="/">← Back to home</Link>
       </header>
       <section className={styles.content} aria-labelledby="login-title">
-        <p className={styles.eyebrow}>ROVA GHANA</p>
+        <p className={styles.eyebrow}>VERIFIED CUSTOMER ACCESS</p>
         <h1 id="login-title">Welcome back.</h1>
-        <p className={styles.intro}>Your ROVA account, all in one place.</p>
-        <p className={styles.notice} id="login-notice">ROVA is preparing for launch. Customer and operator account sign-in is not available yet. Please do not enter credentials.</p>
-        <form className={styles.form} aria-describedby="login-notice">
-          <fieldset disabled>
-            <label htmlFor="login-identity">Phone number or email</label>
-            <input id="login-identity" type="text" autoComplete="username" placeholder="Phone number or email" />
-            <label htmlFor="login-password">Password</label>
-            <input id="login-password" type="password" autoComplete="current-password" placeholder="Password" />
-            <button type="button">Sign in</button>
-          </fieldset>
-        </form>
+        <p className={styles.intro}>Sign in to your activated ROVA customer account.</p>
+        <p className={styles.notice} id="login-notice">
+          An application or status reference is not an account credential. Only applicants who completed secure identity activation can sign in.
+        </p>
+        <CustomerLoginForm />
         <div className={styles.links}>
-          <a href="#password-help">Forgot password?</a>
+          <Link href="/forgot-password">Forgot password?</Link>
           <Link href="/apply">New to ROVA? Apply now</Link>
         </div>
         <div className={styles.help}>
-          <p id="password-help"><strong>Password recovery</strong> will be available when account sign-in launches.</p>
-          <p><strong>Account creation</strong> is not available yet. An application is not an account.</p>
+          <p><strong>Account creation</strong> is controlled. Submitting an application does not activate an account.</p>
+          <p><strong>Booking availability</strong> remains disabled pending separate approval. Signing in does not enable transportation services.</p>
         </div>
         <Link className={styles.status} href="/application-status">Already applied? Check application status <span aria-hidden="true">→</span></Link>
-        <p className={styles.recovery}>Using another device does not restore browser recognition. Secure identity verification is required before account access can be linked.</p>
         <div className={styles.staff}><Link href="/admin">Staff login</Link></div>
       </section>
     </main>

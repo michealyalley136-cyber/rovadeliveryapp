@@ -122,6 +122,20 @@
 .rova-route-summary strong { color: #006838; font-size: 22px; }
 .rova-route-summary span { font-size: 11px; }
 .rova-route-summary p { margin: 6px 0 0; color: #52685a; font-size: 10px; }
+.rova-submit-booking { width: 100%; margin-top: 12px; }
+.rova-booking-unavailable, .rova-pilot-disclaimer { color: #765b14; background: #fff8df; padding: 10px; border: 1px solid #ead99b; border-radius: 8px; }
+.rova-booking-confirmation { max-width: 680px; margin: 28px auto 0; padding: 28px; border: 1px solid #d9e8dc; border-radius: 18px; background: #fbfdfb; }
+.rova-confirmation-mark { display: grid; place-items: center; width: 76px; height: 76px; margin: 14px auto; border-radius: 50%; color: #fff; background: #006838; font-weight: 900; }
+.rova-booking-confirmation h2, .rova-booking-confirmation > p { text-align: center; }
+.rova-booking-reference { color: #006838; font-size: 22px; font-weight: 900; letter-spacing: .03em; }
+.rova-booking-confirmation dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin: 24px 0; border: 1px solid #dfe9e2; border-radius: 10px; background: #dfe9e2; }
+.rova-booking-confirmation dl div { padding: 12px; background: #fff; }
+.rova-booking-confirmation dt { color: #68746c; font-size: 11px; text-transform: uppercase; }
+.rova-booking-confirmation dd { margin: 4px 0 0; font-weight: 700; }
+.rova-confirmation-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.rova-confirmation-actions button, .rova-confirmation-actions a { display: inline-block; padding: 11px 18px; border: 1px solid #006838; border-radius: 8px; background: #fff; color: #006838; text-decoration: none; }
+.rova-confirmation-actions .customer-primary { background: #006838; color: #fff; }
+.rova-booking-details { overflow: auto; padding: 14px; border-radius: 8px; background: #edf3ef; font-size: 12px; text-align: left; }
 .rova-map-shell { position: relative; min-height: 440px; overflow: hidden; border-radius: 16px; background: #edf2ef; border: 1px solid #dce5de; }
 .rova-map { position: absolute; inset: 0; }
 .rova-map-loading, .rova-map-unavailable { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; gap: 8px; padding: 30px; background: #f3f7f4; color: #486051; text-align: center; }
@@ -140,6 +154,13 @@
 .customer-trip { padding: 16px 0; border-top: 1px solid #e5eee7; display: flex; justify-content: space-between; gap: 16px; }
 .customer-trip p { margin: 5px 0 0; color: #647067; }
 .customer-trip > span { color: #006838; text-transform: capitalize; }
+.rova-latest-booking small, .rova-booking-row small { display: block; margin-top: 6px; color: #657169; }
+.rova-booking-row > div:last-child { display: grid; justify-items: end; gap: 7px; }
+.rova-booking-row button { padding: 5px 10px; border: 1px solid #c8d9cd; border-radius: 6px; background: #fff; color: #006838; }
+.rova-booking-details-panel { margin: 20px 0; padding: 18px; border: 1px solid #d7e5da; border-radius: 12px; background: #f5faf6; }
+.rova-booking-details-panel ul { padding-left: 20px; }
+.rova-booking-details-panel li { margin: 8px 0; }
+.rova-booking-details-panel li span { display: block; color: #66736a; }
 .customer-alert, .customer-message { padding: 12px 16px; border-radius: 10px; background: #fff1ed; color: #8d2c12; }
 .customer-message { background: #e8f5e9; color: #006838; }
 .customer-message button { border: 0; background: transparent; color: inherit; float: right; }
@@ -169,6 +190,10 @@
   .rova-map-shell { min-height: 360px; }
   .customer-booking-header { align-items: flex-start; }
   .customer-booking-art { height: 150px; }
+  .rova-booking-confirmation { padding: 20px 16px; }
+  .rova-booking-confirmation dl { grid-template-columns: 1fr; }
+  .rova-booking-row { align-items: flex-start; flex-direction: column; }
+  .rova-booking-row > div:last-child { justify-items: start; }
   .customer-service-image { height: clamp(105px, 31vw, 190px); }
   .customer-service-copy { min-height: 137px; padding: 13px 27px 16px 12px; }
   .customer-service h3 { font-size: 15px; }

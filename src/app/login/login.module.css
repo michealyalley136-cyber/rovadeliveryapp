@@ -37,11 +37,17 @@
 .content h1 { margin: 14px 0 10px; font-size: clamp(32px, 5vw, 42px); letter-spacing: -.04em; }
 .intro { color: #435163; font-size: 15px; }
 .notice { margin: 24px 0; padding: 14px; border-left: 3px solid #b5882e; background: #fff8e6; color: #493910; line-height: 1.5; }
-.form fieldset { display: grid; gap: 9px; margin: 0; padding: 0; border: 0; }
+.form { display: grid; gap: 9px; }
 .form label { margin-top: 6px; font-weight: 700; font-size: 13px; }
 .form input { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid #cbd3d9; border-radius: 3px; background: #f3f5f6; color: #435163; opacity: 1; }
 .form input::placeholder { color: #64707b; opacity: 1; }
-.form button { min-height: 48px; margin-top: 12px; border: 0; border-radius: 3px; background: #d3dae0; color: #435163; font-weight: 800; cursor: not-allowed; }
+.form button { min-height: 48px; margin-top: 12px; border: 0; border-radius: 3px; background: #0c3560; color: #fff; font-weight: 800; cursor: pointer; }
+.form button:disabled { cursor: wait; opacity: .7; }
+.error { margin: 4px 0; color: #9b2020; font-weight: 700; }
+.passwordHint { color: #536171; font-size: 12px; }
+.success { margin-top: 24px; padding: 22px; border: 1px solid #c7dfd0; background: #f1faf5; color: #174c2c; }
+.success h2 { margin: 0 0 8px; }
+.success a { display: inline-block; margin-top: 10px; color: #0c3560; font-weight: 800; text-decoration: underline; }
 .links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; margin-top: 20px; font-weight: 700; }
 .links a, .help a, .status { color: #0c3560; text-decoration: underline; text-underline-offset: 3px; }
 .help { margin-top: 22px; color: #435163; font-size: 13px; line-height: 1.6; }
